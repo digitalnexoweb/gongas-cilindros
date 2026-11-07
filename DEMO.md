@@ -2,6 +2,15 @@
 
 Para tener en la mano el día que se lo mostrás a Joaquín.
 
+## El link
+
+**https://gongas-prototipo.pages.dev**
+
+Ese es el que se manda por WhatsApp. Es HTTPS, que es lo que la cámara exige: desde ahí sí se puede
+escanear. Abrirlo por IP de red local no sirve, Chrome niega la cámara.
+
+Es público y sin contraseña, porque la sección 2 dejó el login afuera a propósito.
+
 ## Antes de salir
 
 1. **Imprimí la hoja de etiquetas.** Ajustes (el engranaje en Escanear) → Etiquetas QR → Imprimir.
