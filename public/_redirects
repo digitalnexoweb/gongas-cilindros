@@ -1,0 +1,3 @@
+# La app no tiene router: todo vive en /. Esto es por si alguien llega a una
+# ruta suelta, para que abra la app en vez de un 404 de Cloudflare.
+/*  /index.html  200

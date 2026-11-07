@@ -1,0 +1,8 @@
+{
+  // El nombre define la URL: https://gongas-prototipo.pages.dev
+  "name": "gongas-prototipo",
+  "compatibility_date": "2026-11-07",
+
+  // Con esto alcanza `wrangler pages deploy`, sin repetir la carpeta ni el nombre.
+  "pages_build_output_dir": "dist"
+}

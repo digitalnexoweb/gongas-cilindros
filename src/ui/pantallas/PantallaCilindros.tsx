@@ -1,0 +1,130 @@
+import { useMemo, useState } from 'react';
+
+import { formatearPesos } from '../../dominio/arriendo';
+import { vistaCilindros, type VistaCilindro } from '../../dominio/consultas';
+import { useEstado } from '../../estado/ProveedorEstado';
+import { Buscador } from '../Buscador';
+import { ChipEstado, estadoVisible, type EstadoVisible } from '../ChipEstado';
+import { Encabezado } from '../Encabezado';
+
+type Filtro = 'todos' | EstadoVisible;
+
+const filtros: { id: Filtro; etiqueta: string }[] = [
+  { id: 'todos', etiqueta: 'Todos' },
+  { id: 'stock', etiqueta: 'En stock' },
+  { id: 'en_gracia', etiqueta: 'En gracia' },
+  { id: 'por_vencer', etiqueta: 'Por vencer' },
+  { id: 'generando_cargo', etiqueta: 'Generando cargo' },
+];
+
+export const nombreTamano = { chico: 'Chico', grande: 'Grande' } as const;
+
+/** La sección 6.2: lista de todos los cilindros, con filtros y buscador por serie. */
+export function PantallaCilindros({ alAbrir }: { alAbrir(cilindroId: string): void }) {
+  const { estado, hoy } = useEstado();
+  const [busqueda, setBusqueda] = useState('');
+  const [filtro, setFiltro] = useState<Filtro>('todos');
+
+  const todas = useMemo(() => vistaCilindros(estado, hoy), [estado, hoy]);
+
+  const visibles = useMemo(() => {
+    const texto = busqueda.trim().toLowerCase();
+
+    return todas.filter((vista) => {
+      if (filtro !== 'todos' && estadoVisible(vista.calculo) !== filtro) return false;
+      if (texto !== '' && !vista.cilindro.serie.toLowerCase().includes(texto)) return false;
+      return true;
+    });
+  }, [todas, busqueda, filtro]);
+
+  return (
+    <>
+      <Encabezado
+        titulo="Cilindros"
+        bajada={
+          visibles.length === todas.length
+            ? `${todas.length} en total`
+            : `${visibles.length} de ${todas.length}`
+        }
+      >
+        <Buscador valor={busqueda} alCambiar={setBusqueda} marcador="Buscar por serie" />
+
+        <div className="flex flex-wrap gap-2">
+          {filtros.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFiltro(f.id)}
+              aria-pressed={filtro === f.id}
+              className={`h-9 rounded-full border px-3.5 text-sm ${
+                filtro === f.id
+                  ? 'border-slate-900 bg-slate-900 font-medium text-white'
+                  : 'border-slate-300 bg-white text-slate-600'
+              }`}
+            >
+              {f.etiqueta}
+            </button>
+          ))}
+        </div>
+      </Encabezado>
+
+      {visibles.length === 0 ? (
+        <p className="px-8 pt-16 text-center text-sm text-slate-500">
+          No hay cilindros que coincidan.
+        </p>
+      ) : (
+        <ul className="divide-y divide-slate-200 border-b border-slate-200 bg-white">
+          {visibles.map((vista) => (
+            <li key={vista.cilindro.id}>
+              <FilaCilindro vista={vista} alAbrir={alAbrir} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+function FilaCilindro({
+  vista,
+  alAbrir,
+}: {
+  vista: VistaCilindro;
+  alAbrir(cilindroId: string): void;
+}) {
+  const { cilindro, ubicacion, calculo } = vista;
+
+  const donde = ubicacion.lugar === 'cliente' ? `En ${ubicacion.cliente.nombre}` : 'En stock';
+  const detalle =
+    calculo === null
+      ? `${nombreTamano[cilindro.tamano]} · ${donde}`
+      : `${nombreTamano[cilindro.tamano]} · ${donde} · ${calculo.dias} días`;
+
+  return (
+    <button
+      type="button"
+      onClick={() => alAbrir(cilindro.id)}
+      className="block w-full px-4 py-3.5 text-left active:bg-slate-50"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-mono text-base font-semibold">{cilindro.serie}</span>
+        <ChipEstado estado={estadoVisible(calculo)} />
+      </div>
+
+      <div className="mt-1 flex items-baseline justify-between gap-3">
+        <span className="truncate text-sm text-slate-500">{detalle}</span>
+
+        {/* En stock no se muestra importe: en stock no se acumula nada. */}
+        {calculo !== null && (
+          <span
+            className={`shrink-0 text-base font-semibold tabular-nums ${
+              calculo.importe > 0 ? 'text-cargo' : 'text-slate-400'
+            }`}
+          >
+            {formatearPesos(calculo.importe)}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}

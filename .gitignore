@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.wrangler/
+
+# Logs y temporales
+*.log
+npm-debug.log*
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Configuración local del editor o de la máquina
+*.local
+.env
+.env.*
+!.env.example

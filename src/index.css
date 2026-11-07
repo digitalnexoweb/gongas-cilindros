@@ -1,0 +1,77 @@
+@import 'tailwindcss';
+
+/*
+ * Los tres estados del arriendo de la sección 5 del SPEC, en un solo lugar.
+ * Texto oscuro sobre fondo claro, para que se lea en un celular al sol.
+ */
+@theme {
+  --color-gracia: #475569;
+  --color-gracia-suave: #f1f5f9;
+  --color-gracia-borde: #cbd5e1;
+
+  --color-vencer: #92400e;
+  --color-vencer-suave: #fef3c7;
+  --color-vencer-borde: #fcd34d;
+
+  --color-cargo: #991b1b;
+  --color-cargo-suave: #fee2e2;
+  --color-cargo-borde: #fca5a5;
+}
+
+body {
+  margin: 0;
+  background-color: #f8fafc;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+  /* Que el rebote del scroll no arrastre la página entera en Android. */
+  overscroll-behavior-y: contain;
+}
+
+/* Nada de resaltado azul al tocar: se siente a web, no a app. */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * Impresión de las etiquetas, sección 6.6.
+ *
+ * En pantalla la hoja va escalada con transform para entrar en un celular de
+ * 375 px; en papel se saca la escala y los milímetros valen lo que dicen.
+ */
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  /* Todo lo que no es la grilla desaparece: navegación, encabezados, botones. */
+  .no-imprimir {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #fff;
+  }
+
+  .envoltorio-hoja {
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+  }
+
+  .hoja {
+    transform: none !important;
+  }
+
+  .hoja + .hoja,
+  .envoltorio-hoja + .envoltorio-hoja {
+    break-before: page;
+  }
+
+  /* Que el navegador no "ahorre tinta" y borre los bordes de recorte. */
+  .etiqueta {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

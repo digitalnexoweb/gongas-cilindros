@@ -1,0 +1,91 @@
+import { useMemo } from 'react';
+
+import { formatearFecha, formatearPesos } from '../../dominio/arriendo';
+import { vistaClientes } from '../../dominio/consultas';
+import { useEstado } from '../../estado/ProveedorEstado';
+import { ChipEstado, estadoVisible } from '../ChipEstado';
+import { Bloque, Dato } from '../Dato';
+import { Encabezado } from '../Encabezado';
+import { nombreTamano } from './PantallaCilindros';
+import { nombreTipoCliente } from './PantallaClientes';
+
+/** La sección 6.3: el detalle de cada cilindro del cliente, con sus días y su importe. */
+export function FichaCliente({ clienteId, alVolver }: { clienteId: string; alVolver(): void }) {
+  const { estado, hoy } = useEstado();
+  const vista = useMemo(
+    () => vistaClientes(estado, hoy).find((v) => v.cliente.id === clienteId) ?? null,
+    [estado, hoy, clienteId],
+  );
+
+  if (vista === null) {
+    return (
+      <>
+        <Encabezado titulo="Cliente" alVolver={alVolver} />
+        <p className="px-8 pt-16 text-center text-sm text-slate-500">Ese cliente no existe.</p>
+      </>
+    );
+  }
+
+  const { cliente, cilindros, total } = vista;
+
+  return (
+    <>
+      <Encabezado
+        titulo={cliente.nombre}
+        bajada={nombreTipoCliente[cliente.tipo]}
+        alVolver={alVolver}
+      />
+
+      <div className="pb-4">
+        <Bloque titulo="El cliente">
+          <Dato etiqueta="Documento">{cliente.documento}</Dato>
+          <Dato etiqueta="Teléfono">{cliente.telefono}</Dato>
+        </Bloque>
+
+        <Bloque titulo={`Cilindros en su poder · ${cilindros.length}`}>
+          {cilindros.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm text-slate-500">
+              No tiene cilindros ahora mismo.
+            </p>
+          ) : (
+            cilindros.map(({ cilindro, arriendo, calculo }) => (
+              <div key={cilindro.id} className="px-4 py-3.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-mono text-base font-semibold">{cilindro.serie}</span>
+                  <ChipEstado estado={estadoVisible(calculo)} />
+                </div>
+
+                <div className="mt-1 flex items-baseline justify-between gap-3">
+                  <span className="truncate text-sm text-slate-500">
+                    {nombreTamano[cilindro.tamano]}
+                    {arriendo !== null && ` · desde el ${formatearFecha(arriendo.fechaEntrega)}`}
+                    {calculo !== null && ` · ${calculo.dias} días`}
+                  </span>
+
+                  {calculo !== null && (
+                    <span
+                      className={`shrink-0 text-base font-semibold tabular-nums ${
+                        calculo.importe > 0 ? 'text-cargo' : 'text-slate-400'
+                      }`}
+                    >
+                      {formatearPesos(calculo.importe)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </Bloque>
+
+        <div className="mt-5 flex items-baseline justify-between gap-4 border-y border-slate-200 bg-white px-4 py-4">
+          <span className="text-base font-semibold">Total acumulado</span>
+          <span
+            className={`text-xl font-bold tabular-nums ${total > 0 ? 'text-cargo' : 'text-slate-400'}`}
+          >
+            {formatearPesos(total)}
+          </span>
+        </div>
+      </div>
+    </>
+  );
+}
