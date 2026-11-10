@@ -9,6 +9,6 @@ process.env.TZ = 'America/Montevideo';
 export default defineConfig({
   test: {
     env: { TZ: 'America/Montevideo' },
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'supabase/**/*.test.ts'],
   },
 });

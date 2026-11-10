@@ -15,3 +15,9 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# De entregables/ se versionan el PDF y el CSV, que son lo que se le mandó al
+# cliente. Lo demás se regenera con `npm run etiquetas`.
+entregables/etiquetas-qr/
+entregables/etiquetas-qr.zip
+entregables/etiquetas-para-imprimir.html
