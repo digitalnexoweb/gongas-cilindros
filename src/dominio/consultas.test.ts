@@ -299,8 +299,10 @@ describe('vistaClientes', () => {
   });
 
   it('la suma de todos los clientes son los $ 689 del estado', () => {
-    const total = vistaClientes(estadoDemo(HOY), HOY).reduce((s, v) => s + v.total, 0);
-    expect(total).toBe(689);
+    const totales = vistaClientes(estadoDemo(HOY), HOY).map((v) => v.total);
+
+    expect(totales).not.toContain(null);
+    expect(totales.reduce<number>((s, t) => s + (t ?? 0), 0)).toBe(689);
   });
 
   it('un cliente nuevo arranca sin cilindros y en 0', () => {
@@ -322,5 +324,85 @@ describe('vistaClientes', () => {
     const nuevo = cliente(sinNada, 'Gasería del Este');
     expect(nuevo.cilindros).toEqual([]);
     expect(nuevo.total).toBe(0);
+  });
+});
+
+// ─────────────────── Cuando quien mira no puede ver las tarifas
+
+describe('sin tarifas: lo que ve un empleado', () => {
+  /** La demo tal como la recibe un empleado: la base no le entrega tarifas. */
+  function demoSinTarifas(): EstadoApp {
+    const estado = estadoDemo(HOY);
+    return { ...estado, cilindros: estado.cilindros.map((c) => ({ ...c, tarifaMensual: null })) };
+  }
+
+  it('el reloj da exactamente igual que con tarifas', () => {
+    const con = vistaCilindros(estadoDemo(HOY), HOY);
+    const sin = vistaCilindros(demoSinTarifas(), HOY);
+
+    const reloj = (v: VistaCilindro) =>
+      v.calculo === null
+        ? null
+        : {
+            dias: v.calculo.dias,
+            diasFacturables: v.calculo.diasFacturables,
+            estado: v.calculo.estado,
+            abierto: v.calculo.abierto,
+          };
+
+    expect(sin.map(reloj)).toEqual(con.map(reloj));
+  });
+
+  it('el importe es null, nunca cero', () => {
+    // CIL-00101 lleva 92 días: con tarifa son $ 469. Sin tarifa no es "$ 0".
+    const v = vistaCilindros(demoSinTarifas(), HOY).find((x) => x.cilindro.serie === 'CIL-00101');
+
+    expect(v?.calculo?.dias).toBe(92);
+    expect(v?.calculo?.estado).toBe('generando_cargo');
+    expect(v?.calculo?.importe).toBeNull();
+    expect(v?.calculo?.tarifaDiaria).toBeNull();
+  });
+
+  it('los avisos salen igual, en el mismo orden: no dependen de la plata', () => {
+    expect(vistaAvisos(demoSinTarifas(), HOY).map((v) => v.cilindro.serie)).toEqual([
+      'CIL-00101',
+      'CIL-00102',
+      'CIL-00103',
+    ]);
+  });
+
+  it('el total de un cliente con cilindros es null', () => {
+    const ancap = vistaClientes(demoSinTarifas(), HOY).find((v) => v.cliente.nombre === 'ANCAP');
+
+    expect(ancap?.cilindros).toHaveLength(2);
+    expect(ancap?.total).toBeNull();
+  });
+
+  it('alcanza con que falte una tarifa para que el total sea null, no un total a medias', () => {
+    const estado = estadoDemo(HOY);
+    const unaMenos: EstadoApp = {
+      ...estado,
+      cilindros: estado.cilindros.map((c) =>
+        c.serie === 'CIL-00102' ? { ...c, tarifaMensual: null } : c,
+      ),
+    };
+
+    const ancap = vistaClientes(unaMenos, HOY).find((v) => v.cliente.nombre === 'ANCAP');
+    // Con las dos tarifas son $ 689; mostrar los $ 469 del que sí se ve sería mentir.
+    expect(ancap?.total).toBeNull();
+  });
+
+  it('un cliente sin cilindros sigue en 0: ahí no falta ninguna tarifa', () => {
+    const estado = demoSinTarifas();
+    const sinNada: EstadoApp = {
+      ...estado,
+      clientes: [
+        ...estado.clientes,
+        { id: 'cli-nuevo', nombre: 'Gasería del Este', tipo: 'empresa', documento: '', telefono: '' },
+      ],
+    };
+
+    const nuevo = vistaClientes(sinNada, HOY).find((v) => v.cliente.nombre === 'Gasería del Este');
+    expect(nuevo?.total).toBe(0);
   });
 });

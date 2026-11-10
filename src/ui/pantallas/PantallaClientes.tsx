@@ -4,6 +4,7 @@ import { formatearPesos } from '../../dominio/arriendo';
 import { vistaClientes, type VistaCliente } from '../../dominio/consultas';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { Encabezado } from '../Encabezado';
+import { Importe } from '../Importe';
 
 export const nombreTipoCliente = { empresa: 'Empresa', particular: 'Particular' } as const;
 
@@ -12,13 +13,18 @@ export function PantallaClientes({ alAbrir }: { alAbrir(clienteId: string): void
   const { estado, hoy } = useEstado();
   const vistas = useMemo(() => vistaClientes(estado, hoy), [estado, hoy]);
 
-  const total = vistas.reduce((suma, v) => suma + v.total, 0);
+  // Si de algún cliente no se puede ver el total, no hay total general: sería falso.
+  const total = vistas.some((v) => v.total === null)
+    ? null
+    : vistas.reduce((suma, v) => suma + (v.total ?? 0), 0);
+
+  const cuantos = vistas.length === 1 ? '1 cliente' : `${vistas.length} clientes`;
 
   return (
     <>
       <Encabezado
         titulo="Clientes"
-        bajada={`${vistas.length} clientes · ${formatearPesos(total)} en total`}
+        bajada={total === null ? cuantos : `${cuantos} · ${formatearPesos(total)} en total`}
       />
 
       {vistas.length === 0 ? (
@@ -60,13 +66,7 @@ function FilaCliente({
     >
       <div className="flex items-center justify-between gap-3">
         <span className="truncate text-base font-semibold">{cliente.nombre}</span>
-        <span
-          className={`shrink-0 text-base font-semibold tabular-nums ${
-            total > 0 ? 'text-cargo' : 'text-slate-400'
-          }`}
-        >
-          {formatearPesos(total)}
-        </span>
+        <Importe valor={total} />
       </div>
 
       <p className="mt-1 text-sm text-slate-500">

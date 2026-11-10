@@ -19,11 +19,22 @@ import { Encabezado } from '../Encabezado';
  * así los meses se suman sin pisarse y el CSV sirve para cobrar.
  */
 export function PantallaResumen() {
-  const { estado, hoy } = useEstado();
+  const { estado, hoy, puedeVerPlata } = useEstado();
 
   const meses = useMemo(() => mesesConMovimiento(estado, hoy), [estado, hoy]);
   const [mes, setMes] = useState<Mes>(() => mesDe(hoy));
   const resumen = useMemo(() => resumenDelMes(estado, mes, hoy), [estado, mes, hoy]);
+
+  if (!puedeVerPlata) {
+    return (
+      <>
+        <Encabezado titulo="Resumen del mes" />
+        <p className="px-8 pt-16 text-center text-sm text-slate-500">
+          El resumen del mes muestra importes, así que lo ve solo el administrador.
+        </p>
+      </>
+    );
+  }
 
   return (
     <>
@@ -42,7 +53,12 @@ export function PantallaResumen() {
         </select>
       </Encabezado>
 
-      {resumen.filas.length === 0 ? (
+      {resumen === null ? (
+        <p className="px-8 pt-16 text-center text-sm text-slate-500">
+          A algún cilindro con cargo en {nombreDelMes(mes)} le falta la tarifa, así que el total
+          no se puede calcular.
+        </p>
+      ) : resumen.filas.length === 0 ? (
         <p className="px-8 pt-16 text-center text-sm text-slate-500">
           En {nombreDelMes(mes)} ningún cilindro generó cargo.
         </p>
@@ -78,7 +94,10 @@ export function PantallaResumen() {
       <div className="px-4 py-5">
         <button
           type="button"
-          onClick={() => descargarTexto(nombreArchivoCSV(mes), csvDelResumen(resumen))}
+          disabled={resumen === null}
+          onClick={() => {
+            if (resumen !== null) descargarTexto(nombreArchivoCSV(mes), csvDelResumen(resumen));
+          }}
           className="h-13 w-full rounded-xl border border-slate-900 py-3.5 text-base font-semibold active:bg-slate-100"
         >
           Exportar a CSV

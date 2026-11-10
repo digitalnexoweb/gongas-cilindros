@@ -303,14 +303,91 @@ describe('un usuario desactivado', () => {
 // ───────────────────────────────────────────────────────── Garantías
 
 describe('garantías', () => {
-  it('cada cuenta nueva nace con su perfil, como empleado y activa', async () => {
-    const id = await base.crearUsuario('Recién Llegado');
+  /** Crea la cuenta tal como la crearía Supabase, sin que nadie la active. */
+  async function cuentaRecienCreada(nombre: string): Promise<string> {
+    const [cuenta] = await base.duenio.filas<{ id: string }>(
+      'insert into auth.users (email, raw_user_meta_data) values ($1, $2) returning id',
+      [`${nombre.toLowerCase()}@afuera.test`, JSON.stringify({ nombre })],
+    );
+    if (cuenta === undefined) throw new Error('no se creó la cuenta');
+    return cuenta.id;
+  }
+
+  it('cada cuenta nueva nace con su perfil, como empleado y DESACTIVADA', async () => {
+    const id = await cuentaRecienCreada('Colado');
 
     const [perfil] = await base.duenio.filas<{ nombre: string; rol: string; activo: boolean }>(
       'select nombre, rol, activo from public.perfiles where id = $1',
       [id],
     );
-    expect(perfil).toEqual({ nombre: 'Recién Llegado', rol: 'operador', activo: true });
+    expect(perfil).toEqual({ nombre: 'Colado', rol: 'operador', activo: false });
+  });
+
+  it('quien se registra por su cuenta no ve nada ni puede operar', async () => {
+    // La segunda traba, por si el registro público quedara abierto.
+    const id = await cuentaRecienCreada('Curioso');
+
+    for (const tabla of [...TABLAS_DE_TRABAJO, ...TABLAS_DE_PLATA]) {
+      expect(await base.como(id, (s) => s.filas(`select * from public.${tabla}`))).toEqual([]);
+    }
+
+    await expect(
+      base.como(id, (s) => s.filas("select public.confirmar_lote('devolucion', array['CIL-00001'])")),
+    ).rejects.toThrow(/No autorizado/);
+  });
+
+  it('empieza a ver recién cuando Joaquín la activa', async () => {
+    const id = await cuentaRecienCreada('Nueva');
+    const ve = () => base.como(id, (s) => s.filas('select id from public.clientes'));
+
+    expect(await ve()).toEqual([]);
+
+    await base.como(joaquin, (s) =>
+      s.afectadas('update public.perfiles set activo = true where id = $1', [id]),
+    );
+
+    expect((await ve()).length).toBeGreaterThan(0);
+  });
+
+  it('el perfil se crea aunque quien crea la cuenta no pueda ejecutar la función', async () => {
+    // En Supabase las cuentas las crea un servicio con su propio rol, y la
+    // migración 0006 le sacó a todos el permiso de ejecutar crear_perfil. El
+    // trigger tiene que dispararse igual: si no, crear un usuario daría error.
+    await base.duenio.afectadas('create role servicio_de_cuentas nologin');
+    await base.duenio.afectadas('grant usage on schema auth to servicio_de_cuentas');
+    await base.duenio.afectadas('grant select, insert on auth.users to servicio_de_cuentas');
+
+    const [permiso] = await base.duenio.filas<{ puede: boolean }>(
+      "select has_function_privilege('servicio_de_cuentas', 'public.crear_perfil()', 'execute') as puede",
+    );
+    expect(permiso?.puede).toBe(false);
+
+    let id: string | undefined;
+    try {
+      await base.duenio.afectadas('set role servicio_de_cuentas');
+      const [cuenta] = await base.duenio.filas<{ id: string }>(
+        `insert into auth.users (email, raw_user_meta_data)
+         values ('por-servicio@gongas.test', '{"nombre":"Por Servicio"}') returning id`,
+      );
+      id = cuenta?.id;
+    } finally {
+      await base.duenio.afectadas('reset role');
+    }
+
+    const perfiles = await base.duenio.filas<{ nombre: string; activo: boolean }>(
+      'select nombre, activo from public.perfiles where id = $1',
+      [id],
+    );
+    expect(perfiles).toEqual([{ nombre: 'Por Servicio', activo: false }]);
+  });
+
+  it('sin sesión no se puede ejecutar ninguna función interna', async () => {
+    const funciones = await base.duenio.filas<{ funcion: string }>(
+      `select p.proname as funcion
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')`,
+    );
+    expect(funciones).toEqual([]);
   });
 
   it('el sistema no se puede quedar sin administrador', async () => {

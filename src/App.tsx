@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { ProveedorEstado, useEstado } from './estado/ProveedorEstado';
+import { ProveedorEstado, useSesion } from './estado/ProveedorEstado';
+import { CuentaDesactivada } from './ui/CuentaDesactivada';
 import { NavegacionInferior, type Pestana } from './ui/NavegacionInferior';
-import { PedirOperador } from './ui/PedirOperador';
 import { FichaCilindro } from './ui/pantallas/FichaCilindro';
 import { FichaCliente } from './ui/pantallas/FichaCliente';
 import { PantallaAjustes } from './ui/pantallas/PantallaAjustes';
@@ -11,6 +11,7 @@ import { PantallaCilindros } from './ui/pantallas/PantallaCilindros';
 import { PantallaClientes } from './ui/pantallas/PantallaClientes';
 import { PantallaEscaneo } from './ui/pantallas/PantallaEscaneo';
 import { PantallaEtiquetas } from './ui/pantallas/PantallaEtiquetas';
+import { PantallaIngreso } from './ui/pantallas/PantallaIngreso';
 import { PantallaResumen } from './ui/pantallas/PantallaResumen';
 
 /**
@@ -26,14 +27,62 @@ type Capa =
 export function App() {
   return (
     <ProveedorEstado>
-      <Armazon />
+      <Portones />
     </ProveedorEstado>
   );
 }
 
-function Armazon() {
-  const { estado, actualizar } = useEstado();
+/** Qué se muestra según en qué está la sesión. La app solo aparece con todo listo. */
+function Portones() {
+  const { sesion, reintentar, cerrarSesion } = useSesion();
 
+  switch (sesion.fase) {
+    case 'cargando':
+      return (
+        <div className="flex min-h-dvh items-center justify-center">
+          <p className="text-slate-500">Cargando…</p>
+        </div>
+      );
+
+    case 'sin_sesion':
+      return <PantallaIngreso />;
+
+    case 'desactivada':
+      return <CuentaDesactivada nombre={sesion.nombre} />;
+
+    case 'error':
+      return (
+        <div className="flex min-h-dvh flex-col justify-center gap-6 px-6 pb-16">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">No se pudieron cargar los datos</h1>
+            <p className="mt-2 text-slate-500">{sesion.mensaje}</p>
+          </div>
+
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={reintentar}
+              className="h-14 w-full rounded-xl bg-slate-900 text-base font-semibold text-white active:bg-slate-700"
+            >
+              Reintentar
+            </button>
+            <button
+              type="button"
+              onClick={() => void cerrarSesion()}
+              className="h-14 w-full rounded-xl border border-slate-300 text-base font-semibold active:bg-slate-100"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      );
+
+    case 'lista':
+      return <Armazon />;
+  }
+}
+
+function Armazon() {
   // Escanear es la pantalla de inicio, como dice la sección 6.1.
   const [pestana, setPestana] = useState<Pestana>('escanear');
   const [capas, setCapas] = useState<Capa[]>([]);
@@ -70,11 +119,6 @@ function Armazon() {
     setCapas([]);
     setPestana(siguiente);
   }, []);
-
-  // "El nombre elegido al abrir la app", de la sección 4. Una sola vez.
-  if (estado.operador.trim() === '') {
-    return <PedirOperador alElegir={(nombre) => actualizar({ ...estado, operador: nombre })} />;
-  }
 
   const capa = capas.at(-1) ?? null;
 

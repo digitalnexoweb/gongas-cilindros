@@ -247,6 +247,29 @@ export type AvisoLote = {
   mensaje: string;
 };
 
+/**
+ * El texto de cada aviso, en un solo lugar. Lo usa `confirmarLote` de acá y
+ * también la app cuando el lote lo confirma la base, que devuelve solo el tipo.
+ */
+export function mensajeDeAviso(serie: string, tipo: TipoAviso): string {
+  switch (tipo) {
+    case 'serie_repetida':
+      return `${serie} estaba repetida en el lote. Se tomó una sola vez.`;
+    case 'serie_desconocida':
+      return `${serie} no está en el sistema. Hay que darla de alta.`;
+    case 'ya_en_este_cliente':
+      return `${serie} ya figuraba en este cliente. El reloj sigue desde la entrega original.`;
+    case 'ya_en_otro_cliente':
+      return `${serie} figuraba en otro cliente. Se cerró ese arriendo y se abrió el nuevo.`;
+    case 'ya_en_stock':
+      return `${serie} ya figuraba en stock. Se registró el movimiento igual.`;
+  }
+}
+
+export function armarAviso(serie: string, tipo: TipoAviso): AvisoLote {
+  return { serie, tipo, mensaje: mensajeDeAviso(serie, tipo) };
+}
+
 export type OrdenLote = {
   tipo: TipoMovimiento;
   series: string[];
@@ -294,22 +317,14 @@ export function confirmarLote(estado: EstadoApp, orden: OrdenLote): ResultadoLot
 
   for (const serie of orden.series) {
     if (yaVistas.has(serie)) {
-      avisos.push({
-        serie,
-        tipo: 'serie_repetida',
-        mensaje: `${serie} estaba repetida en el lote. Se tomó una sola vez.`,
-      });
+      avisos.push(armarAviso(serie, 'serie_repetida'));
       continue;
     }
     yaVistas.add(serie);
 
     const cilindro = estado.cilindros.find((c) => c.serie === serie);
     if (cilindro === undefined) {
-      avisos.push({
-        serie,
-        tipo: 'serie_desconocida',
-        mensaje: `${serie} no está en el sistema. Hay que darla de alta.`,
-      });
+      avisos.push(armarAviso(serie, 'serie_desconocida'));
       continue;
     }
 
@@ -321,18 +336,10 @@ export function confirmarLote(estado: EstadoApp, orden: OrdenLote): ResultadoLot
       if (abierto !== undefined && abierto.clienteId === clienteId) {
         // Ya estaba en este mismo cliente. Se avisa y NO se toca el arriendo:
         // cerrarlo y abrir otro pondría el reloj en cero y borraría lo acumulado.
-        avisos.push({
-          serie,
-          tipo: 'ya_en_este_cliente',
-          mensaje: `${serie} ya figuraba en este cliente. El reloj sigue desde la entrega original.`,
-        });
+        avisos.push(armarAviso(serie, 'ya_en_este_cliente'));
       } else {
         if (abierto !== undefined) {
-          avisos.push({
-            serie,
-            tipo: 'ya_en_otro_cliente',
-            mensaje: `${serie} figuraba en otro cliente. Se cerró ese arriendo y se abrió el nuevo.`,
-          });
+          avisos.push(armarAviso(serie, 'ya_en_otro_cliente'));
           arriendos = arriendos.map((a) =>
             a.id === abierto.id ? { ...a, fechaDevolucion: orden.fecha } : a,
           );
@@ -364,11 +371,7 @@ export function confirmarLote(estado: EstadoApp, orden: OrdenLote): ResultadoLot
 
     // Devolución.
     if (abierto === undefined) {
-      avisos.push({
-        serie,
-        tipo: 'ya_en_stock',
-        mensaje: `${serie} ya figuraba en stock. Se registró el movimiento igual.`,
-      });
+      avisos.push(armarAviso(serie, 'ya_en_stock'));
     } else {
       arriendos = arriendos.map((a) =>
         a.id === abierto.id ? { ...a, fechaDevolucion: orden.fecha } : a,

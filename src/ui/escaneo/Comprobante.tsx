@@ -1,35 +1,27 @@
 import { useState } from 'react';
 
-import { formatearFecha, type FechaISO } from '../../dominio/arriendo';
-import { cilindroPorId, clientePorId } from '../../dominio/consultas';
+import type { LoteConfirmado } from '../../datos/repositorio';
+import { formatearFecha } from '../../dominio/arriendo';
 import { linkWhatsApp, textoComprobante } from '../../dominio/mensajes';
-import type { ResultadoLote } from '../../dominio/storage';
-import type { TipoMovimiento } from '../../dominio/tipos';
+import type { Cliente, TipoMovimiento } from '../../dominio/tipos';
 import { Encabezado } from '../Encabezado';
 
 /** El comprobante de 6.1: las series, el cliente y la fecha, para copiar o mandar. */
 export function Comprobante({
-  resultado,
+  lote,
   tipo,
-  clienteId,
-  fecha,
+  cliente,
   alTerminar,
 }: {
-  resultado: ResultadoLote;
+  /** Lo que la base confirmó que grabó: sus series y su fecha, no las del celular. */
+  lote: LoteConfirmado;
   tipo: TipoMovimiento;
-  clienteId: string | null;
-  fecha: FechaISO;
+  cliente: Cliente | null;
   alTerminar(): void;
 }) {
   const [copiado, setCopiado] = useState(false);
 
-  // Las series que realmente se grabaron, no las que se escanearon: si alguna
-  // se salteó, el comprobante tiene que decir la verdad.
-  const series = resultado.movimientos.map(
-    (m) => cilindroPorId(resultado.estado, m.cilindroId)?.serie ?? '—',
-  );
-  const cliente = clienteId === null ? null : clientePorId(resultado.estado, clienteId);
-  const texto = textoComprobante({ tipo, series, cliente, fecha });
+  const texto = textoComprobante({ tipo, series: lote.series, cliente, fecha: lote.fecha });
 
   async function copiar() {
     try {
@@ -45,17 +37,17 @@ export function Comprobante({
     <>
       <Encabezado
         titulo={tipo === 'entrega' ? 'Entrega confirmada' : 'Devolución confirmada'}
-        bajada={`${formatearFecha(fecha)}${cliente === null ? '' : ` · ${cliente.nombre}`}`}
+        bajada={`${formatearFecha(lote.fecha)}${cliente === null ? '' : ` · ${cliente.nombre}`}`}
       />
 
       <div className="px-4 pt-4 pb-6">
         <div className="rounded-xl border border-slate-200 bg-white">
           <p className="border-b border-slate-200 px-4 py-3 text-sm text-slate-500">
-            {series.length === 1 ? '1 cilindro' : `${series.length} cilindros`}
+            {lote.series.length === 1 ? '1 cilindro' : `${lote.series.length} cilindros`}
           </p>
 
           <ul className="divide-y divide-slate-100">
-            {series.map((serie, i) => (
+            {lote.series.map((serie, i) => (
               <li key={`${serie}-${i}`} className="px-4 py-3 font-mono text-base font-semibold">
                 {serie}
               </li>
@@ -63,11 +55,11 @@ export function Comprobante({
           </ul>
         </div>
 
-        {resultado.avisos.length > 0 && (
+        {lote.avisos.length > 0 && (
           <div className="mt-4 rounded-xl border border-vencer-borde bg-vencer-suave p-4">
             <p className="text-sm font-semibold text-vencer">Avisos del lote</p>
             <ul className="mt-2 space-y-1">
-              {resultado.avisos.map((a, i) => (
+              {lote.avisos.map((a, i) => (
                 <li key={`${a.serie}-${i}`} className="text-sm text-vencer">
                   {a.mensaje}
                 </li>

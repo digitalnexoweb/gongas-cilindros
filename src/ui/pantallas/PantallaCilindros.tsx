@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 
-import { formatearPesos } from '../../dominio/arriendo';
 import { vistaCilindros, type VistaCilindro } from '../../dominio/consultas';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { Buscador } from '../Buscador';
 import { ChipEstado, estadoVisible, type EstadoVisible } from '../ChipEstado';
 import { Encabezado } from '../Encabezado';
+import { Importe } from '../Importe';
 
 type Filtro = 'todos' | EstadoVisible;
 
@@ -114,16 +114,9 @@ function FilaCilindro({
       <div className="mt-1 flex items-baseline justify-between gap-3">
         <span className="truncate text-sm text-slate-500">{detalle}</span>
 
-        {/* En stock no se muestra importe: en stock no se acumula nada. */}
-        {calculo !== null && (
-          <span
-            className={`shrink-0 text-base font-semibold tabular-nums ${
-              calculo.importe > 0 ? 'text-cargo' : 'text-slate-400'
-            }`}
-          >
-            {formatearPesos(calculo.importe)}
-          </span>
-        )}
+        {/* En stock no hay importe porque no se acumula nada; y si quien mira
+            no puede ver la plata, tampoco. */}
+        {calculo !== null && <Importe valor={calculo.importe} />}
       </div>
     </button>
   );

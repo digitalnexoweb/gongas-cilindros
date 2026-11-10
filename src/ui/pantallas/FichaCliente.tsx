@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
 
-import { formatearFecha, formatearPesos } from '../../dominio/arriendo';
+import { formatearFecha } from '../../dominio/arriendo';
 import { vistaClientes } from '../../dominio/consultas';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { ChipEstado, estadoVisible } from '../ChipEstado';
 import { Bloque, Dato } from '../Dato';
 import { Encabezado } from '../Encabezado';
+import { Importe } from '../Importe';
 import { nombreTamano } from './PantallaCilindros';
 import { nombreTipoCliente } from './PantallaClientes';
 
@@ -62,29 +63,19 @@ export function FichaCliente({ clienteId, alVolver }: { clienteId: string; alVol
                     {calculo !== null && ` · ${calculo.dias} días`}
                   </span>
 
-                  {calculo !== null && (
-                    <span
-                      className={`shrink-0 text-base font-semibold tabular-nums ${
-                        calculo.importe > 0 ? 'text-cargo' : 'text-slate-400'
-                      }`}
-                    >
-                      {formatearPesos(calculo.importe)}
-                    </span>
-                  )}
+                  {calculo !== null && <Importe valor={calculo.importe} />}
                 </div>
               </div>
             ))
           )}
         </Bloque>
 
-        <div className="mt-5 flex items-baseline justify-between gap-4 border-y border-slate-200 bg-white px-4 py-4">
-          <span className="text-base font-semibold">Total acumulado</span>
-          <span
-            className={`text-xl font-bold tabular-nums ${total > 0 ? 'text-cargo' : 'text-slate-400'}`}
-          >
-            {formatearPesos(total)}
-          </span>
-        </div>
+        {total !== null && (
+          <div className="mt-5 flex items-baseline justify-between gap-4 border-y border-slate-200 bg-white px-4 py-4">
+            <span className="text-base font-semibold">Total acumulado</span>
+            <Importe valor={total} grande />
+          </div>
+        )}
       </div>
     </>
   );

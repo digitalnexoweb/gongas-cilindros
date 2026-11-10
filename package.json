@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && wrangler pages deploy",
+    "deploy": "node -e \"console.error('Desactivado: esta versión tiene login y publicarla pisaría la demo de gongas-prototipo.pages.dev. Se publica en la etapa E, en un link nuevo.'); process.exit(1)\"",
     "etiquetas": "node scripts/listado-rotuladora.ts",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -28,6 +28,7 @@
     "vitest": "^5.1.0"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.0",
     "@zxing/browser": "^0.2.1",
     "qrcode": "^1.5.4",
     "react": "^19.3.1",

@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 
+import type { LoteConfirmado } from '../../datos/repositorio';
 import { cilindroPorSerie, ubicacionDe } from '../../dominio/consultas';
 import { serieDesdeQR, serieTipeada } from '../../dominio/qr';
-import { confirmarLote, type ResultadoLote } from '../../dominio/storage';
 import type { EstadoApp, TipoMovimiento } from '../../dominio/tipos';
 import { senalDeLectura } from '../../escaneo/senales';
 import { useEscaner } from '../../escaneo/useEscaner';
@@ -19,7 +19,7 @@ type Paso =
   | { nombre: 'escaneando'; tipo: TipoMovimiento; clienteId: string | null }
   | {
       nombre: 'comprobante';
-      resultado: ResultadoLote;
+      lote: LoteConfirmado;
       tipo: TipoMovimiento;
       clienteId: string | null;
     };
@@ -57,15 +57,22 @@ function evaluar(
     : { serie, conocido: true, aviso: null };
 }
 
-/** La sección 6.1 completa. Las reglas no están acá: las pone `confirmarLote`. */
+/**
+ * La sección 6.1 completa. Las reglas no están acá: las pone `confirmar_lote`,
+ * en la base, que es quien graba.
+ */
 export function PantallaEscaneo({ alAbrirAjustes }: { alAbrirAjustes(): void }) {
-  const { estado, hoy, actualizar } = useEstado();
+  const { estado, perfil, confirmarLote } = useEstado();
 
   const [paso, setPaso] = useState<Paso>({ nombre: 'modo' });
   const [series, setSeries] = useState<string[]>([]);
   const [aviso, setAviso] = useState<string | null>(null);
   const [aDarDeAlta, setADarDeAlta] = useState<string | null>(null);
   const [serieManual, setSerieManual] = useState('');
+
+  // Grabar ahora va a un servidor: tarda y puede fallar.
+  const [grabando, setGrabando] = useState(false);
+  const [errorAlGrabar, setErrorAlGrabar] = useState<string | null>(null);
 
   // Para no repetir el mismo aviso treinta veces por segundo en escaneo continuo.
   const seriesRef = useRef<string[]>([]);
@@ -110,27 +117,26 @@ export function PantallaEscaneo({ alAbrirAjustes }: { alAbrirAjustes(): void }) 
     setSeries([]);
     setAviso(null);
     setSerieManual('');
+    setErrorAlGrabar(null);
     setPaso(tipo === 'entrega' ? { nombre: 'cliente' } : { nombre: 'escaneando', tipo, clienteId: null });
   }
 
-  function confirmar() {
-    if (paso.nombre !== 'escaneando') return;
+  async function confirmar() {
+    if (paso.nombre !== 'escaneando' || grabando) return;
+    const { tipo, clienteId } = paso;
 
-    const resultado = confirmarLote(estado, {
-      tipo: paso.tipo,
-      series,
-      clienteId: paso.clienteId,
-      operador: estado.operador,
-      fecha: hoy,
-    });
+    setGrabando(true);
+    setErrorAlGrabar(null);
 
-    actualizar(resultado.estado);
-    setPaso({
-      nombre: 'comprobante',
-      resultado,
-      tipo: paso.tipo,
-      clienteId: paso.clienteId,
-    });
+    try {
+      const lote = await confirmarLote(tipo, series, clienteId);
+      setPaso({ nombre: 'comprobante', lote, tipo, clienteId });
+    } catch (error) {
+      // El lote queda en pantalla tal cual: no se pierde lo escaneado.
+      setErrorAlGrabar(error instanceof Error ? error.message : 'No se pudo grabar el lote.');
+    } finally {
+      setGrabando(false);
+    }
   }
 
   if (paso.nombre === 'modo') {
@@ -138,7 +144,7 @@ export function PantallaEscaneo({ alAbrirAjustes }: { alAbrirAjustes(): void }) 
       <>
         <Encabezado
           titulo="Escanear"
-          bajada={`Operando: ${estado.operador}`}
+          bajada={`Operando: ${perfil.nombre}`}
           accion={
             // La sección 6.6 deja Ajustes fuera de la navegación de cinco ítems,
             // así que se entra por acá, que es donde Joaquín arranca.
@@ -197,10 +203,9 @@ export function PantallaEscaneo({ alAbrirAjustes }: { alAbrirAjustes(): void }) 
   if (paso.nombre === 'comprobante') {
     return (
       <Comprobante
-        resultado={paso.resultado}
+        lote={paso.lote}
         tipo={paso.tipo}
-        clienteId={paso.clienteId}
-        fecha={hoy}
+        cliente={estado.clientes.find((c) => c.id === paso.clienteId) ?? null}
         alTerminar={() => {
           setSeries([]);
           setPaso({ nombre: 'modo' });
@@ -298,7 +303,7 @@ export function PantallaEscaneo({ alAbrirAjustes }: { alAbrirAjustes(): void }) 
           type="text"
           value={serieManual}
           onChange={(e) => setSerieManual(e.target.value)}
-          placeholder="Cargar a mano, ej. CIL-00105"
+          placeholder="Cargar a mano, ej. CIL-00001"
           className="h-12 min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-4 text-base placeholder:text-slate-400 focus:border-slate-900 focus:outline-none"
         />
         <button
@@ -310,13 +315,22 @@ export function PantallaEscaneo({ alAbrirAjustes }: { alAbrirAjustes(): void }) 
       </form>
 
       <div className="px-4 pt-5 pb-4">
+        {errorAlGrabar !== null && (
+          <p
+            role="alert"
+            className="mb-3 rounded-xl border border-cargo-borde bg-cargo-suave p-3 text-sm text-cargo"
+          >
+            {errorAlGrabar}
+          </p>
+        )}
+
         <button
           type="button"
-          onClick={confirmar}
-          disabled={items.length === 0}
+          onClick={() => void confirmar()}
+          disabled={items.length === 0 || grabando}
           className="h-14 w-full rounded-xl bg-slate-900 text-base font-semibold text-white active:bg-slate-700 disabled:bg-slate-300"
         >
-          Confirmar lote
+          {grabando ? 'Grabando…' : errorAlGrabar !== null ? 'Reintentar' : 'Confirmar lote'}
         </button>
       </div>
 

@@ -1,11 +1,7 @@
-import {
-  calcularArriendo,
-  formatearFecha,
-  formatearPesos,
-  tarifaDiaria,
-} from '../../dominio/arriendo';
+import { formatearFecha, formatearPesos, tarifaDiaria } from '../../dominio/arriendo';
 import {
   arriendosDe,
+  calcularVisible,
   cilindroPorId,
   clientePorId,
   historialDe,
@@ -16,6 +12,7 @@ import type { EstadoApp } from '../../dominio/tipos';
 import { ChipEstado, estadoVisible } from '../ChipEstado';
 import { Bloque, Dato } from '../Dato';
 import { Encabezado } from '../Encabezado';
+import { Importe } from '../Importe';
 import { nombreTamano } from './PantallaCilindros';
 
 /** La sección 6.2: la ficha, con el historial completo de movimientos. */
@@ -66,15 +63,11 @@ export function FichaCilindro({
               <Dato etiqueta="Desde">{formatearFecha(vista.arriendo.fechaEntrega)}</Dato>
               <Dato etiqueta="Días transcurridos">{vista.calculo.dias}</Dato>
               <Dato etiqueta="Días facturables">{vista.calculo.diasFacturables}</Dato>
-              <Dato etiqueta="Acumulado">
-                <span
-                  className={`text-base font-semibold tabular-nums ${
-                    vista.calculo.importe > 0 ? 'text-cargo' : ''
-                  }`}
-                >
-                  {formatearPesos(vista.calculo.importe)}
-                </span>
-              </Dato>
+              {vista.calculo.importe !== null && (
+                <Dato etiqueta="Acumulado">
+                  <Importe valor={vista.calculo.importe} />
+                </Dato>
+              )}
             </>
           )}
         </Bloque>
@@ -85,15 +78,20 @@ export function FichaCilindro({
           </Dato>
           <Dato etiqueta="Tipo de gas">{cilindro.tipoGas}</Dato>
           <Dato etiqueta="Tamaño">{nombreTamano[cilindro.tamano]}</Dato>
-          <Dato etiqueta="Tarifa mensual">{formatearPesos(cilindro.tarifaMensual)}</Dato>
           {/*
             La diaria va con decimales a propósito: el SPEC dice que no se
             redondea. Mostrar "$ 13" invitaría a la cuenta equivocada, porque
             32 × 13 da 416 y el importe correcto es 405.
+            Sin tarifa —un empleado— no se muestra ninguna de las dos.
           */}
-          <Dato etiqueta="Tarifa diaria">
-            $ {tarifaDiaria(cilindro.tarifaMensual).toFixed(2).replace('.', ',')} por día
-          </Dato>
+          {cilindro.tarifaMensual !== null && (
+            <>
+              <Dato etiqueta="Tarifa mensual">{formatearPesos(cilindro.tarifaMensual)}</Dato>
+              <Dato etiqueta="Tarifa diaria">
+                $ {tarifaDiaria(cilindro.tarifaMensual).toFixed(2).replace('.', ',')} por día
+              </Dato>
+            </>
+          )}
         </Bloque>
 
         {ultimoCerrado !== null && ultimoCerrado.fechaDevolucion !== null && (
@@ -104,11 +102,15 @@ export function FichaCilindro({
             <Dato etiqueta="Entregado">{formatearFecha(ultimoCerrado.fechaEntrega)}</Dato>
             <Dato etiqueta="Devuelto">{formatearFecha(ultimoCerrado.fechaDevolucion)}</Dato>
             <Dato etiqueta="Días">
-              {calcularArriendo(ultimoCerrado, cilindro.tarifaMensual, hoy).dias}
+              {calcularVisible(ultimoCerrado, cilindro.tarifaMensual, hoy).dias}
             </Dato>
-            <Dato etiqueta="Quedó en">
-              {formatearPesos(calcularArriendo(ultimoCerrado, cilindro.tarifaMensual, hoy).importe)}
-            </Dato>
+            {cilindro.tarifaMensual !== null && (
+              <Dato etiqueta="Quedó en">
+                {formatearPesos(
+                  calcularVisible(ultimoCerrado, cilindro.tarifaMensual, hoy).importe ?? 0,
+                )}
+              </Dato>
+            )}
           </Bloque>
         )}
 

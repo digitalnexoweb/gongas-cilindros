@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { calcularArriendo, type FechaISO } from './arriendo';
 import { estadoDemo } from './storage';
-import type { Cliente } from './tipos';
+import type { Cilindro, Cliente } from './tipos';
 import {
   csvDelResumen,
   diasFacturablesEnMes,
@@ -22,6 +22,19 @@ const HOY: FechaISO = '2026-11-06';
 
 function arriendo(fechaEntrega: FechaISO, fechaDevolucion: FechaISO | null = null) {
   return { fechaEntrega, fechaDevolucion };
+}
+
+/** La tarifa de un cilindro de la demo, que siempre la tiene. */
+function tarifaDe(cilindro: Cilindro): number {
+  if (cilindro.tarifaMensual === null) throw new Error(`${cilindro.serie} no tiene tarifa`);
+  return cilindro.tarifaMensual;
+}
+
+/** El resumen de la demo, que siempre se puede calcular. */
+function resumenDemo(mes: string): ResumenMensual {
+  const resumen = resumenDelMes(estadoDemo(HOY), mes, HOY);
+  if (resumen === null) throw new Error('la demo tiene todas las tarifas');
+  return resumen;
 }
 
 // ─────────────────────────────────────────── Los bordes del mes
@@ -138,10 +151,10 @@ describe('los meses suman el acumulado', () => {
 
       const diasPorMeses = meses.reduce((s, m) => s + diasFacturablesEnMes(arr, m, HOY), 0);
       const importePorMeses = meses.reduce(
-        (s, m) => s + importeEnMes(arr, cilindro.tarifaMensual, m, HOY),
+        (s, m) => s + importeEnMes(arr, tarifaDe(cilindro), m, HOY),
         0,
       );
-      const deSiempre = calcularArriendo(arr, cilindro.tarifaMensual, HOY);
+      const deSiempre = calcularArriendo(arr, tarifaDe(cilindro), HOY);
 
       expect(diasPorMeses).toBe(deSiempre.diasFacturables);
       expect(importePorMeses).toBe(deSiempre.importe);
@@ -154,8 +167,8 @@ describe('los meses suman el acumulado', () => {
     const arr = estado.arriendos.find((a) => a.cilindroId === cil?.id);
     if (cil === undefined || arr === undefined) throw new Error('falta CIL-00101');
 
-    const octubre = importeEnMes(arr, cil.tarifaMensual, '2026-10', HOY);
-    const noviembre = importeEnMes(arr, cil.tarifaMensual, '2026-11', HOY);
+    const octubre = importeEnMes(arr, tarifaDe(cil), '2026-10', HOY);
+    const noviembre = importeEnMes(arr, tarifaDe(cil), '2026-11', HOY);
 
     expect(octubre).toBe(381);
     expect(noviembre).toBe(88);
@@ -167,7 +180,7 @@ describe('los meses suman el acumulado', () => {
 
 describe('resumenDelMes', () => {
   it('octubre da $ 640, con ANCAP y Taller Pereira', () => {
-    const resumen = resumenDelMes(estadoDemo(HOY), '2026-10', HOY);
+    const resumen = resumenDemo('2026-10');
 
     expect(resumen.filas.map((f) => f.cliente.nombre)).toEqual(['ANCAP', 'Taller Pereira']);
     expect(resumen.filas[0]).toMatchObject({ cilindros: 2, diasFacturables: 35, total: 513 });
@@ -176,7 +189,7 @@ describe('resumenDelMes', () => {
   });
 
   it('noviembre da $ 176, solo ANCAP', () => {
-    const resumen = resumenDelMes(estadoDemo(HOY), '2026-11', HOY);
+    const resumen = resumenDemo('2026-11');
 
     expect(resumen.filas.map((f) => f.cliente.nombre)).toEqual(['ANCAP']);
     expect(resumen.filas[0]).toMatchObject({ cilindros: 2, diasFacturables: 12, total: 176 });
@@ -184,7 +197,7 @@ describe('resumenDelMes', () => {
   });
 
   it('un mes sin cargos no trae filas', () => {
-    const resumen = resumenDelMes(estadoDemo(HOY), '2026-09', HOY);
+    const resumen = resumenDemo('2026-09');
 
     expect(resumen.filas).toEqual([]);
     expect(resumen.total).toBe(0);
@@ -192,15 +205,50 @@ describe('resumenDelMes', () => {
 
   it('el total es la suma de las filas', () => {
     for (const mes of ['2026-09', '2026-10', '2026-11']) {
-      const resumen = resumenDelMes(estadoDemo(HOY), mes, HOY);
+      const resumen = resumenDemo(mes);
       expect(resumen.total).toBe(resumen.filas.reduce((s, f) => s + f.total, 0));
     }
   });
 
   it('deja afuera a los clientes sin cargos en el mes', () => {
     // Armada Nacional tiene CIL-00103 con 58 dias: todavia no cobra nada.
-    const resumen = resumenDelMes(estadoDemo(HOY), '2026-11', HOY);
+    const resumen = resumenDemo('2026-11');
     expect(resumen.filas.map((f) => f.cliente.nombre)).not.toContain('Armada Nacional');
+  });
+});
+
+// ─────────────────────── Cuando quien mira no puede ver las tarifas
+
+describe('resumenDelMes sin tarifas', () => {
+  /** La demo tal como la recibe un empleado: la base no le entrega tarifas. */
+  function demoSinTarifas() {
+    const estado = estadoDemo(HOY);
+    return { ...estado, cilindros: estado.cilindros.map((c) => ({ ...c, tarifaMensual: null })) };
+  }
+
+  it('se niega a calcular un mes con cargos, en vez de dar un total falso', () => {
+    expect(resumenDelMes(demoSinTarifas(), '2026-10', HOY)).toBeNull();
+    expect(resumenDelMes(demoSinTarifas(), '2026-11', HOY)).toBeNull();
+  });
+
+  it('alcanza con que falte una sola tarifa de las que generan cargo', () => {
+    const estado = estadoDemo(HOY);
+    const unaMenos = {
+      ...estado,
+      cilindros: estado.cilindros.map((c) =>
+        c.serie === 'CIL-00102' ? { ...c, tarifaMensual: null } : c,
+      ),
+    };
+
+    expect(resumenDelMes(unaMenos, '2026-10', HOY)).toBeNull();
+  });
+
+  it('un mes sin cargos se puede informar igual: no hay plata que esconder', () => {
+    expect(resumenDelMes(demoSinTarifas(), '2026-09', HOY)).toEqual({
+      mes: '2026-09',
+      filas: [],
+      total: 0,
+    });
   });
 });
 

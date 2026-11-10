@@ -125,13 +125,12 @@ export async function crearBase(): Promise<Base> {
         [`${nombre.toLowerCase().replace(/\s+/g, '.')}@gongas.test`, JSON.stringify({ nombre })],
       );
 
-      if (rol !== 'operador' || !activo) {
-        await duenio.afectadas('update public.perfiles set rol = $2, activo = $3 where id = $1', [
-          id,
-          rol,
-          activo,
-        ]);
-      }
+      // Una cuenta nueva nace desactivada (0004): acá se la deja como la pide el test.
+      await duenio.afectadas('update public.perfiles set rol = $2, activo = $3 where id = $1', [
+        id,
+        rol,
+        activo,
+      ]);
 
       return id;
     },

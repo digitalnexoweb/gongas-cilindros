@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
 
-import { formatearFecha, formatearPesos } from '../../dominio/arriendo';
+import { DIAS_GRACIA, formatearFecha } from '../../dominio/arriendo';
 import { vistaAvisos } from '../../dominio/consultas';
 import { linkWhatsApp, textoAviso } from '../../dominio/mensajes';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { ChipEstado, estadoVisible } from '../ChipEstado';
 import { Encabezado } from '../Encabezado';
+import { Importe } from '../Importe';
 
 /** La sección 6.4, que el SPEC llama el corazón del sistema. */
 export function PantallaAvisos() {
@@ -35,12 +36,19 @@ export function PantallaAvisos() {
             const cliente = vista.ubicacion.lugar === 'cliente' ? vista.ubicacion.cliente : null;
             if (cliente === null || vista.arriendo === null || vista.calculo === null) return null;
 
-            const texto = textoAviso({
-              serie: vista.cilindro.serie,
-              fechaEntrega: vista.arriendo.fechaEntrega,
-              dias: vista.calculo.dias,
-              importe: vista.calculo.importe,
-            });
+            // De 61 días en adelante el texto de 6.4 dice el importe. Si quien
+            // mira no lo puede ver, ese aviso no lo puede mandar: es del
+            // administrador. Los "por vencer" no llevan importe y salen igual.
+            const necesitaImporte = vista.calculo.dias > DIAS_GRACIA;
+            const texto =
+              necesitaImporte && vista.calculo.importe === null
+                ? null
+                : textoAviso({
+                    serie: vista.cilindro.serie,
+                    fechaEntrega: vista.arriendo.fechaEntrega,
+                    dias: vista.calculo.dias,
+                    importe: vista.calculo.importe ?? 0,
+                  });
 
             return (
               <li key={vista.cilindro.id} className="px-4 py-3.5">
@@ -56,16 +64,14 @@ export function PantallaAvisos() {
                     {formatearFecha(vista.arriendo.fechaEntrega)}
                   </span>
 
-                  <span
-                    className={`shrink-0 text-base font-semibold tabular-nums ${
-                      vista.calculo.importe > 0 ? 'text-cargo' : 'text-slate-400'
-                    }`}
-                  >
-                    {formatearPesos(vista.calculo.importe)}
-                  </span>
+                  <Importe valor={vista.calculo.importe} />
                 </div>
 
-                {cliente.telefono.trim() === '' ? (
+                {texto === null ? (
+                  <p className="mt-3 text-sm text-slate-400">
+                    Este aviso lleva el importe: lo manda el administrador.
+                  </p>
+                ) : cliente.telefono.trim() === '' ? (
                   <p className="mt-3 text-sm text-slate-400">
                     Sin teléfono cargado, no se puede avisar.
                   </p>

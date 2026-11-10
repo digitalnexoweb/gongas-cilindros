@@ -76,13 +76,36 @@ export function arriendosDe(estado: EstadoApp, cilindroId: string): Arriendo[] {
     .sort((a, b) => (a.fechaEntrega < b.fechaEntrega ? 1 : a.fechaEntrega > b.fechaEntrega ? -1 : 0));
 }
 
+/**
+ * El cálculo de un arriendo tal como lo puede ver quien está mirando.
+ *
+ * El reloj —días, días facturables, estado— está siempre. La plata solo si el
+ * usuario puede ver la tarifa: si no, va `null`, que no es lo mismo que cero.
+ */
+export type CalculoVisible = Omit<CalculoArriendo, 'tarifaDiaria' | 'importe'> & {
+  tarifaDiaria: number | null;
+  importe: number | null;
+};
+
+export function calcularVisible(
+  arriendo: Pick<Arriendo, 'fechaEntrega' | 'fechaDevolucion'>,
+  tarifaMensual: number | null,
+  hoy: FechaISO,
+): CalculoVisible {
+  if (tarifaMensual !== null) return calcularArriendo(arriendo, tarifaMensual, hoy);
+
+  // Sin tarifa se calcula igual el reloj, y la plata se deja explícitamente vacía.
+  const reloj = calcularArriendo(arriendo, 0, hoy);
+  return { ...reloj, tarifaDiaria: null, importe: null };
+}
+
 export type VistaCilindro = {
   cilindro: Cilindro;
   ubicacion: Ubicacion;
   /** El arriendo abierto, o `null` si está en stock. */
   arriendo: Arriendo | null;
   /** El cálculo del arriendo abierto. `null` en stock: ahí no se acumula nada. */
-  calculo: CalculoArriendo | null;
+  calculo: CalculoVisible | null;
 };
 
 /** El cruce del modelo con el cálculo del punto 1. Es lo que leen las pantallas. */
@@ -93,8 +116,7 @@ export function vistaCilindro(estado: EstadoApp, cilindro: Cilindro, hoy: FechaI
     cilindro,
     ubicacion: ubicacionDe(estado, cilindro.id),
     arriendo,
-    calculo:
-      arriendo === null ? null : calcularArriendo(arriendo, cilindro.tarifaMensual, hoy),
+    calculo: arriendo === null ? null : calcularVisible(arriendo, cilindro.tarifaMensual, hoy),
   };
 }
 
@@ -120,8 +142,11 @@ export type VistaCliente = {
   cliente: Cliente;
   /** Los cilindros que tiene ahora en su poder. */
   cilindros: VistaCilindro[];
-  /** Lo que acumulan todos sus cilindros juntos. */
-  total: number;
+  /**
+   * Lo que acumulan todos sus cilindros juntos. `null` si de alguno no se puede
+   * ver el importe: un total a medias sería un número falso.
+   */
+  total: number | null;
 };
 
 /** Una fila por cliente, como pide la sección 6.3. */
@@ -133,10 +158,14 @@ export function vistaClientes(estado: EstadoApp, hoy: FechaISO): VistaCliente[] 
       (v) => v.ubicacion.lugar === 'cliente' && v.ubicacion.cliente.id === cliente.id,
     );
 
+    const importes = suyos.map((v) => (v.calculo === null ? 0 : v.calculo.importe));
+
     return {
       cliente,
       cilindros: suyos,
-      total: suyos.reduce((suma, v) => suma + (v.calculo?.importe ?? 0), 0),
+      total: importes.some((i) => i === null)
+        ? null
+        : importes.reduce<number>((suma, i) => suma + (i ?? 0), 0),
     };
   });
 }

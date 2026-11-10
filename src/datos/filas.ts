@@ -1,0 +1,136 @@
+/**
+ * De filas de la base a la foto del estado que usa toda la app.
+ *
+ * Es puro a propósito: no importa Supabase, así que se puede testear con filas
+ * armadas a mano. El resto del dominio —consultas, resumen, mensajes— sigue
+ * trabajando sobre `EstadoApp` y no se entera de dónde vinieron los datos.
+ */
+
+import { parseFechaISO, type FechaISO } from '../dominio/arriendo';
+import type {
+  Arriendo,
+  Cilindro,
+  Cliente,
+  EstadoApp,
+  Movimiento,
+  Tamano,
+  TipoCliente,
+  TipoMovimiento,
+} from '../dominio/tipos';
+
+export type Rol = 'admin' | 'operador';
+
+export type Perfil = {
+  id: string;
+  nombre: string;
+  rol: Rol;
+  activo: boolean;
+};
+
+export type FilaCliente = {
+  id: string;
+  nombre: string;
+  tipo: TipoCliente;
+  documento: string;
+  telefono: string;
+};
+
+export type FilaCilindro = {
+  id: string;
+  serie: string;
+  tipo_gas: string;
+  tamano: Tamano;
+  activo: boolean;
+};
+
+export type FilaTarifa = {
+  cilindro_id: string;
+  /** `numeric` puede llegar como número o como texto, según quién lo lea. */
+  tarifa_mensual: number | string;
+};
+
+export type FilaArriendo = {
+  id: string;
+  cilindro_id: string;
+  cliente_id: string;
+  fecha_entrega: string;
+  fecha_devolucion: string | null;
+};
+
+export type FilaMovimiento = {
+  id: string;
+  tipo: TipoMovimiento;
+  cilindro_id: string;
+  cliente_id: string | null;
+  fecha: string;
+  lote_id: string;
+  operador: string;
+  creado_en: string;
+};
+
+export type Filas = {
+  clientes: FilaCliente[];
+  cilindros: FilaCilindro[];
+  /** Vacía para un empleado: la base no le entrega tarifas. */
+  tarifas: FilaTarifa[];
+  arriendos: FilaArriendo[];
+  movimientos: FilaMovimiento[];
+};
+
+/**
+ * Las fechas tienen que llegar como 'YYYY-MM-DD'. Si alguna vez llegaran con
+ * hora, es preferible que esto falle fuerte a que la app corra un día para
+ * atrás en silencio: es el error de zona horaria que todo el proyecto evita.
+ */
+function fecha(valor: string): FechaISO {
+  parseFechaISO(valor);
+  return valor;
+}
+
+export function armarEstado(filas: Filas, operador: string): EstadoApp {
+  const tarifas = new Map(filas.tarifas.map((t) => [t.cilindro_id, Number(t.tarifa_mensual)]));
+
+  const clientes: Cliente[] = filas.clientes.map((c) => ({
+    id: c.id,
+    nombre: c.nombre,
+    tipo: c.tipo,
+    documento: c.documento,
+    telefono: c.telefono,
+  }));
+
+  const cilindros: Cilindro[] = filas.cilindros.map((c) => ({
+    id: c.id,
+    serie: c.serie,
+    tipoGas: c.tipo_gas,
+    tamano: c.tamano,
+    // Sin fila de tarifa, `null`: "no la puede ver". Nunca cero.
+    tarifaMensual: tarifas.get(c.id) ?? null,
+    activo: c.activo,
+  }));
+
+  const arriendos: Arriendo[] = filas.arriendos.map((a) => ({
+    id: a.id,
+    cilindroId: a.cilindro_id,
+    clienteId: a.cliente_id,
+    fechaEntrega: fecha(a.fecha_entrega),
+    fechaDevolucion: a.fecha_devolucion === null ? null : fecha(a.fecha_devolucion),
+  }));
+
+  // Del más viejo al más nuevo, por el momento en que se grabaron. El historial
+  // de un cilindro desempata con este orden cuando dos movimientos son del mismo día.
+  const movimientos: Movimiento[] = [...filas.movimientos]
+    .sort((a, b) =>
+      a.creado_en === b.creado_en ? a.id.localeCompare(b.id) : a.creado_en < b.creado_en ? -1 : 1,
+    )
+    .map((m) => ({
+      id: m.id,
+      tipo: m.tipo,
+      cilindroId: m.cilindro_id,
+      clienteId: m.cliente_id,
+      fecha: fecha(m.fecha),
+      loteId: m.lote_id,
+      operador: m.operador,
+    }));
+
+  return { version: 1, operador, clientes, cilindros, arriendos, movimientos };
+}

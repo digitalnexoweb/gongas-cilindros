@@ -24,7 +24,11 @@ export type Cilindro = {
   /** "acetileno" en el prototipo. */
   tipoGas: string;
   tamano: Tamano;
-  tarifaMensual: number;
+  /**
+   * `null` significa "este usuario no la puede ver": a un empleado la base no
+   * le entrega las tarifas. No es cero, y nada tiene que mostrarlo como cero.
+   */
+  tarifaMensual: number | null;
   activo: boolean;
 };
 

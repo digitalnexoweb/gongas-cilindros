@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 
-import { altaCliente } from '../../dominio/storage';
-import type { EstadoApp, TipoCliente } from '../../dominio/tipos';
+import type { Cliente, TipoCliente } from '../../dominio/tipos';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { Buscador } from '../Buscador';
 import { Encabezado } from '../Encabezado';
@@ -14,7 +13,7 @@ export function ElegirCliente({
   alElegir(clienteId: string): void;
   alVolver(): void;
 }) {
-  const { estado, actualizar } = useEstado();
+  const { estado, altaCliente } = useEstado();
   const [busqueda, setBusqueda] = useState('');
   const [dandoDeAlta, setDandoDeAlta] = useState(false);
 
@@ -27,12 +26,8 @@ export function ElegirCliente({
   if (dandoDeAlta) {
     return (
       <FormularioCliente
-        estado={estado}
         alVolver={() => setDandoDeAlta(false)}
-        alCrear={(nuevoEstado, clienteId) => {
-          actualizar(nuevoEstado);
-          alElegir(clienteId);
-        }}
+        alCrear={async (datos) => alElegir(await altaCliente(datos))}
       />
     );
   }
@@ -53,7 +48,8 @@ export function ElegirCliente({
             >
               <span className="text-base font-semibold">{cliente.nombre}</span>
               <span className="mt-0.5 block text-sm text-slate-500">
-                {cliente.tipo === 'empresa' ? 'Empresa' : 'Particular'} · {cliente.documento}
+                {cliente.tipo === 'empresa' ? 'Empresa' : 'Particular'}
+                {cliente.documento !== '' && ` · ${cliente.documento}`}
               </span>
             </button>
           </li>
@@ -62,7 +58,9 @@ export function ElegirCliente({
 
       {visibles.length === 0 && (
         <p className="px-8 pt-10 text-center text-sm text-slate-500">
-          Ningún cliente coincide con la búsqueda.
+          {estado.clientes.length === 0
+            ? 'Todavía no hay clientes. Dá de alta el primero.'
+            : 'Ningún cliente coincide con la búsqueda.'}
         </p>
       )}
 
@@ -81,12 +79,10 @@ export function ElegirCliente({
 
 /** El alta mínima de 6.1: nombre, tipo, documento y teléfono. */
 function FormularioCliente({
-  estado,
   alCrear,
   alVolver,
 }: {
-  estado: EstadoApp;
-  alCrear(nuevoEstado: EstadoApp, clienteId: string): void;
+  alCrear(datos: Omit<Cliente, 'id'>): Promise<void>;
   alVolver(): void;
 }) {
   const [nombre, setNombre] = useState('');
@@ -94,7 +90,10 @@ function FormularioCliente({
   const [documento, setDocumento] = useState('');
   const [telefono, setTelefono] = useState('+598');
 
-  const listo = nombre.trim() !== '';
+  const [creando, setCreando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const listo = nombre.trim() !== '' && !creando;
 
   return (
     <form
@@ -102,13 +101,18 @@ function FormularioCliente({
         e.preventDefault();
         if (!listo) return;
 
-        const { estado: nuevoEstado, cliente } = altaCliente(estado, {
+        setCreando(true);
+        setError(null);
+        alCrear({
           nombre: nombre.trim(),
           tipo,
           documento: documento.trim(),
           telefono: telefono.trim(),
-        });
-        alCrear(nuevoEstado, cliente.id);
+        })
+          .catch((falla: unknown) => {
+            setError(falla instanceof Error ? falla.message : 'No se pudo crear el cliente.');
+          })
+          .finally(() => setCreando(false));
       }}
     >
       <Encabezado titulo="Cliente nuevo" alVolver={alVolver} />
@@ -145,12 +149,21 @@ function FormularioCliente({
         />
         <Campo etiqueta="Teléfono" valor={telefono} alCambiar={setTelefono} modo="tel" />
 
+        {error !== null && (
+          <p
+            role="alert"
+            className="rounded-xl border border-cargo-borde bg-cargo-suave p-3 text-sm text-cargo"
+          >
+            {error}
+          </p>
+        )}
+
         <button
           type="submit"
           disabled={!listo}
           className="h-14 w-full rounded-xl bg-slate-900 text-base font-semibold text-white active:bg-slate-700 disabled:bg-slate-300"
         >
-          Crear y seguir
+          {creando ? 'Creando…' : 'Crear y seguir'}
         </button>
       </div>
     </form>

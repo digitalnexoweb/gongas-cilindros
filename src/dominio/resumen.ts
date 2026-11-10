@@ -123,7 +123,16 @@ export type ResumenMensual = {
   total: number;
 };
 
-export function resumenDelMes(estado: EstadoApp, mes: Mes, hoy: FechaISO): ResumenMensual {
+/**
+ * Devuelve `null` si falta la tarifa de algún cilindro que generó cargo en el
+ * mes. Pasa cuando quien mira no puede ver tarifas: antes que un total armado
+ * con datos a medias, no se calcula nada.
+ */
+export function resumenDelMes(
+  estado: EstadoApp,
+  mes: Mes,
+  hoy: FechaISO,
+): ResumenMensual | null {
   const porCliente = new Map<string, FilaResumen>();
 
   for (const arriendo of estado.arriendos) {
@@ -133,6 +142,7 @@ export function resumenDelMes(estado: EstadoApp, mes: Mes, hoy: FechaISO): Resum
     const cilindro = estado.cilindros.find((c) => c.id === arriendo.cilindroId);
     const cliente = estado.clientes.find((c) => c.id === arriendo.clienteId);
     if (cilindro === undefined || cliente === undefined) continue;
+    if (cilindro.tarifaMensual === null) return null;
 
     const fila = porCliente.get(cliente.id) ?? {
       cliente,

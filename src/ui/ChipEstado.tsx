@@ -1,10 +1,10 @@
-import type { CalculoArriendo, EstadoArriendo } from '../dominio/arriendo';
+import type { EstadoArriendo } from '../dominio/arriendo';
 
 /** Los tres estados de la sección 5, más el stock, que no es un arriendo. */
 export type EstadoVisible = EstadoArriendo | 'stock';
 
 /** Sin arriendo abierto no hay estado de arriendo: el cilindro está en stock. */
-export function estadoVisible(calculo: CalculoArriendo | null): EstadoVisible {
+export function estadoVisible(calculo: { estado: EstadoArriendo } | null): EstadoVisible {
   return calculo?.estado ?? 'stock';
 }
 

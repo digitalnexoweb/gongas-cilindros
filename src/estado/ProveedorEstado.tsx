@@ -1,38 +1,223 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 
+import * as repositorio from '../datos/repositorio';
+import type { LoteConfirmado } from '../datos/repositorio';
+import type { Perfil } from '../datos/filas';
 import { hoyISO, type FechaISO } from '../dominio/arriendo';
-import { almacenLocalStorage, grabarEstado, inicializar } from '../dominio/storage';
-import type { EstadoApp } from '../dominio/tipos';
+import type { Cliente, EstadoApp, Tamano, TipoMovimiento } from '../dominio/tipos';
+
+/**
+ * La sesión y la foto del estado.
+ *
+ * Antes la foto salía de `localStorage`, al instante y sin fallar. Ahora sale
+ * de la base: hay que saber quién está conectado, esperar la carga, y volver a
+ * cargar cuando otra persona escribe.
+ */
+
+export type Sesion =
+  | { fase: 'cargando' }
+  | { fase: 'sin_sesion' }
+  /** Hay cuenta, pero un administrador todavía no la activó, o la desactivó. */
+  | { fase: 'desactivada'; nombre: string | null }
+  | { fase: 'error'; mensaje: string }
+  | { fase: 'lista'; perfil: Perfil; estado: EstadoApp };
+
+type ContextoSesion = {
+  sesion: Sesion;
+  ingresar(mail: string, clave: string): Promise<void>;
+  cerrarSesion(): Promise<void>;
+  reintentar(): void;
+};
 
 type ContextoEstado = {
   estado: EstadoApp;
-  /** El mismo "hoy" para toda la app. Se calcula una sola vez al abrirla. */
+  perfil: Perfil;
+  /** Solo el administrador. A los demás la base no les entrega tarifas. */
+  puedeVerPlata: boolean;
+  /** El mismo "hoy" para toda la app, según el reloj del dispositivo. */
   hoy: FechaISO;
-  /** Graba en localStorage y re-renderiza. La usa el punto 4. */
-  actualizar(nuevo: EstadoApp): void;
+  recargar(): Promise<void>;
+  /** Graba el lote en la base y recarga. Si falla, tira y no cambia nada. */
+  confirmarLote(
+    tipo: TipoMovimiento,
+    series: string[],
+    clienteId: string | null,
+  ): Promise<LoteConfirmado>;
+  /** Da de alta un cliente, recarga y devuelve su id. */
+  altaCliente(datos: Omit<Cliente, 'id'>): Promise<string>;
+  altaCilindro(serie: string, tamano: Tamano): Promise<void>;
 };
 
-const Contexto = createContext<ContextoEstado | null>(null);
+const ContextoDeSesion = createContext<ContextoSesion | null>(null);
+const ContextoDeEstado = createContext<ContextoEstado | null>(null);
 
-export function ProveedorEstado({ children }: { children: ReactNode }) {
-  // El "hoy" queda congelado al abrir: toda la pantalla cuenta los días contra
-  // la misma fecha, igual que el dominio, que lo recibe siempre desde afuera.
-  const [hoy] = useState<FechaISO>(() => hoyISO());
+/** Cuánto se espera para juntar varios avisos de la base en una sola recarga. */
+const MS_PARA_JUNTAR_CAMBIOS = 200;
 
-  // En el inicializador, no en un useEffect: así la demo ya está sembrada en el
-  // primer render y no se ve un parpadeo con la lista vacía.
-  const [estado, setEstado] = useState<EstadoApp>(() => inicializar(almacenLocalStorage, hoy));
-
-  const actualizar = useCallback((nuevo: EstadoApp) => {
-    grabarEstado(almacenLocalStorage, nuevo);
-    setEstado(nuevo);
-  }, []);
-
-  return <Contexto.Provider value={{ estado, hoy, actualizar }}>{children}</Contexto.Provider>;
+function mensajeDe(error: unknown): string {
+  return error instanceof Error ? error.message : 'Algo salió mal. Probá de nuevo.';
 }
 
+export function ProveedorEstado({ children }: { children: ReactNode }) {
+  // `undefined` es "todavía no sé si hay sesión"; `null` es "no hay".
+  const [usuarioId, setUsuarioId] = useState<string | null | undefined>(undefined);
+  const [sesion, setSesion] = useState<Sesion>({ fase: 'cargando' });
+  const [hoy, setHoy] = useState<FechaISO>(() => hoyISO());
+  const [intento, setIntento] = useState(0);
+
+  // Si llegan dos cargas cruzadas, vale la que se pidió última.
+  const turno = useRef(0);
+
+  // ── Quién está conectado en este dispositivo.
+  useEffect(() => {
+    let vivo = true;
+
+    void repositorio.usuarioConSesion().then((id) => {
+      if (vivo) setUsuarioId(id);
+    });
+    const dejarDeEscuchar = repositorio.alCambiarLaSesion((id) => setUsuarioId(id));
+
+    return () => {
+      vivo = false;
+      dejarDeEscuchar();
+    };
+  }, []);
+
+  /**
+   * Trae el perfil y la foto. En silencio, si falla se queda con lo que ya
+   * había en pantalla: una recarga de fondo no debe tapar el trabajo con un error.
+   */
+  const cargar = useCallback(async (id: string, enSilencio: boolean) => {
+    const miTurno = ++turno.current;
+
+    try {
+      const perfil = await repositorio.cargarPerfil(id);
+      if (miTurno !== turno.current) return;
+
+      if (perfil === null || !perfil.activo) {
+        setSesion({ fase: 'desactivada', nombre: perfil?.nombre ?? null });
+        return;
+      }
+
+      const estado = await repositorio.cargarEstado(perfil);
+      if (miTurno !== turno.current) return;
+
+      setSesion({ fase: 'lista', perfil, estado });
+    } catch (error) {
+      if (miTurno !== turno.current || enSilencio) return;
+      setSesion({ fase: 'error', mensaje: mensajeDe(error) });
+    }
+  }, []);
+
+  // ── Cargar al entrar, y cada vez que cambia quién está conectado.
+  useEffect(() => {
+    if (usuarioId === undefined) return;
+
+    if (usuarioId === null) {
+      turno.current += 1;
+      setSesion({ fase: 'sin_sesion' });
+      return;
+    }
+
+    setSesion({ fase: 'cargando' });
+    void cargar(usuarioId, false);
+  }, [usuarioId, intento, cargar]);
+
+  // ── Lo que escribe otro se ve acá sin recargar.
+  useEffect(() => {
+    if (usuarioId === undefined || usuarioId === null) return;
+
+    let espera: number | null = null;
+
+    const dejarDeEscuchar = repositorio.suscribirCambios(() => {
+      // Un lote de cinco cilindros dispara diez avisos: se juntan en una recarga.
+      if (espera !== null) window.clearTimeout(espera);
+      espera = window.setTimeout(() => void cargar(usuarioId, true), MS_PARA_JUNTAR_CAMBIOS);
+    });
+
+    return () => {
+      if (espera !== null) window.clearTimeout(espera);
+      dejarDeEscuchar();
+    };
+  }, [usuarioId, cargar]);
+
+  // ── Al volver a la app: el día puede haber cambiado y pudo perderse un aviso.
+  useEffect(() => {
+    function alVolver() {
+      if (document.visibilityState !== 'visible') return;
+      setHoy(hoyISO());
+      if (typeof usuarioId === 'string') void cargar(usuarioId, true);
+    }
+
+    document.addEventListener('visibilitychange', alVolver);
+    return () => document.removeEventListener('visibilitychange', alVolver);
+  }, [usuarioId, cargar]);
+
+  const recargar = useCallback(async () => {
+    if (typeof usuarioId === 'string') await cargar(usuarioId, true);
+  }, [usuarioId, cargar]);
+
+  const valorDeSesion = useMemo<ContextoSesion>(
+    () => ({
+      sesion,
+      ingresar: repositorio.ingresar,
+      cerrarSesion: repositorio.cerrarSesion,
+      reintentar: () => setIntento((n) => n + 1),
+    }),
+    [sesion],
+  );
+
+  const valorDeEstado = useMemo<ContextoEstado | null>(() => {
+    if (sesion.fase !== 'lista') return null;
+
+    return {
+      estado: sesion.estado,
+      perfil: sesion.perfil,
+      puedeVerPlata: sesion.perfil.rol === 'admin',
+      hoy,
+      recargar,
+      async confirmarLote(tipo, series, clienteId) {
+        const lote = await repositorio.confirmarLote(tipo, series, clienteId);
+        await recargar();
+        return lote;
+      },
+      async altaCliente(datos) {
+        const id = await repositorio.altaCliente(datos);
+        await recargar();
+        return id;
+      },
+      async altaCilindro(serie, tamano) {
+        await repositorio.altaCilindro(serie, tamano);
+        await recargar();
+      },
+    };
+  }, [sesion, hoy, recargar]);
+
+  return (
+    <ContextoDeSesion.Provider value={valorDeSesion}>
+      <ContextoDeEstado.Provider value={valorDeEstado}>{children}</ContextoDeEstado.Provider>
+    </ContextoDeSesion.Provider>
+  );
+}
+
+export function useSesion(): ContextoSesion {
+  const valor = useContext(ContextoDeSesion);
+  if (valor === null) throw new Error('useSesion tiene que estar dentro de ProveedorEstado.');
+  return valor;
+}
+
+/** Solo para las pantallas que se muestran con la sesión lista. */
 export function useEstado(): ContextoEstado {
-  const valor = useContext(Contexto);
-  if (valor === null) throw new Error('useEstado tiene que estar dentro de ProveedorEstado.');
+  const valor = useContext(ContextoDeEstado);
+  if (valor === null) throw new Error('useEstado solo se puede usar con la sesión iniciada.');
   return valor;
 }
