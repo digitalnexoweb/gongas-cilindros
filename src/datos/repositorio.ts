@@ -9,14 +9,16 @@
 
 import type { FechaISO } from '../dominio/arriendo';
 import { armarAviso, type AvisoLote, type TipoAviso } from '../dominio/storage';
-import type { Cliente, EstadoApp, Tamano, TipoMovimiento } from '../dominio/tipos';
+import type { Cliente, EstadoApp, Tamano, TextosAviso, TipoMovimiento } from '../dominio/tipos';
 import {
   armarEstado,
   type FilaArriendo,
+  type FilaAviso,
   type FilaCilindro,
   type FilaCliente,
   type FilaMovimiento,
   type FilaTarifa,
+  type FilaTextosAviso,
   type Perfil,
 } from './filas';
 import { supabase } from './supabase';
@@ -139,7 +141,7 @@ async function traerTodo<T>(tabla: string, columnas: string, orden: string[]): P
 
 /** La foto completa del estado, tal como la base se la entrega a este usuario. */
 export async function cargarEstado(perfil: Perfil): Promise<EstadoApp> {
-  const [clientes, cilindros, tarifas, arriendos, movimientos] = await Promise.all([
+  const [clientes, cilindros, tarifas, arriendos, movimientos, avisos, textos] = await Promise.all([
     traerTodo<FilaCliente>('clientes', 'id, nombre, tipo, documento, telefono', ['nombre', 'id']),
     traerTodo<FilaCilindro>('cilindros', 'id, serie, tipo_gas, tamano, activo', ['serie']),
     // A un empleado esto le vuelve vacío: la base no le entrega tarifas.
@@ -154,9 +156,28 @@ export async function cargarEstado(perfil: Perfil): Promise<EstadoApp> {
       'id, tipo, cilindro_id, cliente_id, fecha, lote_id, operador, creado_en',
       ['creado_en', 'id'],
     ),
+    traerTodo<FilaAviso>(
+      'avisos',
+      'id, arriendo_id, cilindro_id, cliente_id, dias, operador, creado_en',
+      ['creado_en', 'id'],
+    ),
+    supabase.from('textos_aviso').select('con_cargo, por_vencer').maybeSingle(),
   ]);
 
-  return armarEstado({ clientes, cilindros, tarifas, arriendos, movimientos }, perfil.nombre);
+  if (textos.error !== null) throw falla(textos.error);
+
+  return armarEstado(
+    {
+      clientes,
+      cilindros,
+      tarifas,
+      arriendos,
+      movimientos,
+      avisos,
+      textosAviso: textos.data as FilaTextosAviso | null,
+    },
+    perfil.nombre,
+  );
 }
 
 // ───────────────────────────────────────────────────────── Escribir
@@ -337,6 +358,33 @@ export async function cambiarTarifaPorTamano(tamano: Tamano, tarifa: number): Pr
   });
   if (error !== null) throw falla(error);
   return data as number;
+}
+
+// ───────────────────────────────────────────────────────── Avisos
+
+/**
+ * Deja constancia de que alguien abrió WhatsApp para avisar de este arriendo.
+ * Quién y cuándo los pone la base.
+ */
+export async function registrarAviso(arriendoId: string): Promise<void> {
+  const { error } = await supabase.rpc('registrar_aviso', { p_arriendo_id: arriendoId });
+  if (error !== null) throw falla(error);
+}
+
+/** Solo el administrador. Sin permiso, la regla por fila no toca nada. */
+export async function guardarTextosAviso(textos: TextosAviso): Promise<void> {
+  const { data, error } = await supabase
+    .from('textos_aviso')
+    .update({
+      con_cargo: textos.conCargo,
+      por_vencer: textos.porVencer,
+      actualizado_en: new Date().toISOString(),
+    })
+    .eq('id', true)
+    .select('id');
+
+  if (error !== null) throw falla(error);
+  if ((data ?? []).length === 0) throw new Error('No tenés permiso para hacer eso.');
 }
 
 // ───────────────────────────────────────────────────────── Enterarse

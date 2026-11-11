@@ -1,10 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
-import { DIAS_GRACIA, formatearFecha, formatearPesos } from '../../dominio/arriendo';
-import { vistaAvisos } from '../../dominio/consultas';
-import { linkWhatsApp, textoAviso } from '../../dominio/mensajes';
+import { diasEntre, formatearFecha, formatearPesos, type FechaISO } from '../../dominio/arriendo';
+import { vistaAvisos, type CalculoVisible } from '../../dominio/consultas';
+import { TEXTOS_AVISO_ORIGINALES, linkWhatsApp, textoDelAviso } from '../../dominio/mensajes';
+import type { AvisoRegistrado, Cliente, TextosAviso } from '../../dominio/tipos';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { ChipEstado, estadoVisible } from '../ChipEstado';
+import { cuandoEnFrase, enMontevideo } from '../hora';
+import { WhatsApp } from '../iconos';
 import { Importe } from '../Importe';
 
 /** La sección 6.4, que el SPEC llama el corazón del sistema. */
@@ -52,70 +55,148 @@ export function PantallaAvisos() {
         </p>
       </header>
 
+
       {avisos.length === 0 ? (
-        <p className="px-8 pt-16 text-center text-sm text-slate-500">
+        <p className="px-8 pt-16 text-center text-sm text-tinta-2">
           Ningún cilindro llegó a los 54 días. No hay nada que avisar.
         </p>
       ) : (
-        <ul className="divide-y divide-slate-200 border-b border-slate-200 bg-white">
-          {avisos.map((vista) => {
-            const cliente = vista.ubicacion.lugar === 'cliente' ? vista.ubicacion.cliente : null;
-            if (cliente === null || vista.arriendo === null || vista.calculo === null) return null;
+        <>
+          <ul className="divide-y divide-linea border-b border-linea bg-white">
+            {avisos.map((vista) => {
+              const cliente = vista.ubicacion.lugar === 'cliente' ? vista.ubicacion.cliente : null;
+              if (cliente === null || vista.arriendo === null || vista.calculo === null) return null;
 
-            // De 61 días en adelante el texto de 6.4 dice el importe. Si quien
-            // mira no lo puede ver, ese aviso no lo puede mandar: es del
-            // administrador. Los "por vencer" no llevan importe y salen igual.
-            const necesitaImporte = vista.calculo.dias > DIAS_GRACIA;
-            const texto =
-              necesitaImporte && vista.calculo.importe === null
-                ? null
-                : textoAviso({
-                    serie: vista.cilindro.serie,
-                    fechaEntrega: vista.arriendo.fechaEntrega,
-                    dias: vista.calculo.dias,
-                    importe: vista.calculo.importe ?? 0,
-                  });
+              return (
+                <FilaAviso
+                  key={vista.cilindro.id}
+                  cliente={cliente}
+                  serie={vista.cilindro.serie}
+                  arriendoId={vista.arriendo.id}
+                  fechaEntrega={vista.arriendo.fechaEntrega}
+                  calculo={vista.calculo}
+                  ultimo={ultimoAvisoDe(estado.avisos, vista.arriendo.id)}
+                  textos={estado.textosAviso ?? TEXTOS_AVISO_ORIGINALES}
+                  hoy={hoy}
+                />
+              );
+            })}
+          </ul>
 
-            return (
-              <li key={vista.cilindro.id} className="px-4 py-3.5">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="truncate text-base font-semibold">{cliente.nombre}</span>
-                  <ChipEstado estado={estadoVisible(vista.calculo)} />
-                </div>
-
-                <div className="mt-1 flex items-baseline justify-between gap-3">
-                  <span className="truncate text-sm text-slate-500">
-                    <span className="font-mono">{vista.cilindro.serie}</span> ·{' '}
-                    {vista.calculo.dias} días · desde el{' '}
-                    {formatearFecha(vista.arriendo.fechaEntrega)}
-                  </span>
-
-                  <Importe valor={vista.calculo.importe} />
-                </div>
-
-                {texto === null ? (
-                  <p className="mt-3 text-sm text-slate-400">
-                    Este aviso lleva el importe: lo manda el administrador.
-                  </p>
-                ) : cliente.telefono.trim() === '' ? (
-                  <p className="mt-3 text-sm text-slate-400">
-                    Sin teléfono cargado, no se puede avisar.
-                  </p>
-                ) : (
-                  <a
-                    href={linkWhatsApp(cliente.telefono, texto)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-3 flex h-12 items-center justify-center rounded-xl border border-slate-900 text-base font-semibold active:bg-slate-100"
-                  >
-                    Avisar por WhatsApp
-                  </a>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+          <p className="px-4 pt-3 pb-6 text-sm text-tinta-2">
+            "Avisado" quiere decir que alguien abrió WhatsApp con el mensaje. La app no puede saber
+            si después tocó Enviar.
+          </p>
+        </>
       )}
     </>
+  );
+}
+
+/** Cuántos días tiene que pasar para que volver a avisar no parezca repetido. */
+const DIAS_PARA_REAVISAR = 7;
+
+function ultimoAvisoDe(avisos: AvisoRegistrado[] | undefined, arriendoId: string): AvisoRegistrado | null {
+  // Vienen del más viejo al más nuevo.
+  return (avisos ?? []).filter((a) => a.arriendoId === arriendoId).at(-1) ?? null;
+}
+
+function FilaAviso({
+  cliente,
+  serie,
+  arriendoId,
+  fechaEntrega,
+  calculo,
+  ultimo,
+  textos,
+  hoy,
+}: {
+  cliente: Cliente;
+  serie: string;
+  arriendoId: string;
+  fechaEntrega: FechaISO;
+  calculo: CalculoVisible;
+  ultimo: AvisoRegistrado | null;
+  textos: TextosAviso;
+  hoy: FechaISO;
+}) {
+  const { registrarAviso } = useEstado();
+  const [error, setError] = useState<string | null>(null);
+
+  // `null` si el texto lleva el importe y quien mira no lo puede ver: ese aviso
+  // es del administrador.
+  const texto = textoDelAviso(textos, {
+    cliente: cliente.nombre,
+    serie,
+    fechaEntrega,
+    dias: calculo.dias,
+    importe: calculo.importe,
+  });
+
+  const momento = ultimo === null ? null : enMontevideo(ultimo.creadoEn);
+  const reciente = momento !== null && diasEntre(momento.fecha, hoy) < DIAS_PARA_REAVISAR;
+
+  return (
+    <li className="px-4 py-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="truncate text-base font-semibold">{cliente.nombre}</span>
+        <ChipEstado estado={estadoVisible(calculo)} />
+      </div>
+
+      <div className="mt-1 flex items-baseline justify-between gap-3">
+        <span className="truncate text-sm text-tinta-2">
+          <span className="font-mono">{serie}</span> · {calculo.dias} días · desde el{' '}
+          {formatearFecha(fechaEntrega)}
+        </span>
+
+        <Importe valor={calculo.importe} />
+      </div>
+
+      <p className={`mt-2 text-sm ${ultimo === null ? 'text-tinta-2' : 'font-medium text-gracia'}`}>
+        {ultimo === null
+          ? 'Sin avisar todavía'
+          : `Avisado ${cuandoEnFrase(ultimo.creadoEn, hoy)} por ${ultimo.operador}`}
+      </p>
+
+      {texto === null ? (
+        <p className="mt-3 text-sm text-tinta-2">Este aviso lleva el importe: lo manda el administrador.</p>
+      ) : cliente.telefono.replace(/\D/g, '').length < 8 ? (
+        <p className="mt-3 text-sm text-tinta-2">
+          Sin teléfono cargado, no se puede avisar. Se carga en la ficha del cliente.
+        </p>
+      ) : (
+        <a
+          href={linkWhatsApp(cliente.telefono, texto)}
+          target="_blank"
+          rel="noreferrer"
+          onClick={() => {
+            // No se espera: WhatsApp se abre en el mismo toque y el registro
+            // viaja en paralelo. Si falla, se avisa acá.
+            setError(null);
+            registrarAviso(arriendoId).catch((falla: unknown) => {
+              setError(
+                falla instanceof Error
+                  ? `No quedó registrado: ${falla.message}`
+                  : 'No quedó registrado el aviso.',
+              );
+            });
+          }}
+          className={`mt-3 flex items-center justify-center gap-2 rounded-[15px] text-base font-semibold ${
+            reciente
+              ? 'h-[50px] border-[1.5px] border-linea-fuerte bg-white text-tinta active:bg-fondo'
+              : 'h-14 bg-tinta font-titulo font-bold text-white active:bg-marca-tinta'
+          }`}
+        >
+          <WhatsApp className="size-5" trazo={2} />
+          {reciente ? 'Avisar de nuevo' : 'Avisar por WhatsApp'}
+        </a>
+      )}
+
+      {error !== null && (
+        <p role="alert" className="mt-2 text-sm text-cargo">
+          {error}
+        </p>
+      )}
+    </li>
   );
 }

@@ -73,6 +73,34 @@ export type Movimiento = {
   creadoEn?: string;
 };
 
+/**
+ * Una vez que alguien tocó "Avisar por WhatsApp". Dice que se abrió WhatsApp
+ * con el mensaje, no que el cliente lo haya recibido.
+ */
+export type AvisoRegistrado = {
+  id: string;
+  arriendoId: string;
+  cilindroId: string;
+  clienteId: string;
+  /** Los días que llevaba el arriendo cuando se avisó. */
+  dias: number;
+  operador: string;
+  /** El momento exacto, como lo guarda la base (ISO, en UTC). */
+  creadoEn: string;
+};
+
+/**
+ * El texto genérico de los avisos, con huecos entre llaves que se completan con
+ * los datos de cada cliente: {cliente}, {serie}, {desde}, {dias}, {importe},
+ * {sin_cargo}.
+ */
+export type TextosAviso = {
+  /** De 61 días en adelante: lleva el importe. */
+  conCargo: string;
+  /** De 54 a 60: avisa cuánto le queda sin cargo. */
+  porVencer: string;
+};
+
 /** Todo lo que se guarda, en una sola pieza. */
 export type EstadoApp = {
   version: 1;
@@ -81,4 +109,8 @@ export type EstadoApp = {
   cilindros: Cilindro[];
   arriendos: Arriendo[];
   movimientos: Movimiento[];
+  /** Solo vienen de la base. La demo no los tiene. */
+  avisos?: AvisoRegistrado[];
+  /** Solo vienen de la base. Sin esto, se usan los textos originales. */
+  textosAviso?: TextosAviso;
 };

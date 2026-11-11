@@ -9,7 +9,7 @@ import {
   formatearPesos,
   type FechaISO,
 } from './arriendo';
-import type { Cliente, TipoMovimiento } from './tipos';
+import type { Cliente, TextosAviso, TipoMovimiento } from './tipos';
 
 /** El comprobante de la sección 6.1: las series, el cliente y la fecha. */
 export function textoComprobante(datos: {
@@ -60,6 +60,74 @@ export function textoAviso(datos: {
 
   const queda = sinCargo === 1 ? 'le queda 1 día sin cargo' : `le quedan ${sinCargo} días sin cargo`;
   return `${cabeza} A partir del día 61 empieza a generar arrendamiento: ${queda}. ${cola}`;
+}
+
+// ───────────────────────────────────────────────────── El texto editable
+
+/**
+ * Los textos con los que arranca la app, los mismos de la migración 0010. Son
+ * los de 6.4 con un saludo al cliente por su nombre. "Volver al texto original"
+ * vuelve a estos.
+ */
+export const TEXTOS_AVISO_ORIGINALES: TextosAviso = {
+  conCargo:
+    'Hola {cliente}, les recordamos que el cilindro {serie} está en su poder desde el {desde} ({dias} días). A partir del día 61 genera un arrendamiento de {importe} a la fecha. Cualquier duda quedamos a las órdenes. GONGAS',
+  porVencer:
+    'Hola {cliente}, les recordamos que el cilindro {serie} está en su poder desde el {desde} ({dias} días). A partir del día 61 empieza a generar arrendamiento: {sin_cargo}. Cualquier duda quedamos a las órdenes. GONGAS',
+};
+
+/** Los huecos que se pueden usar en el texto, con lo que dicen. */
+export const HUECOS_AVISO = [
+  { hueco: '{cliente}', explicacion: 'El nombre del cliente' },
+  { hueco: '{serie}', explicacion: 'La serie del cilindro' },
+  { hueco: '{desde}', explicacion: 'La fecha de entrega' },
+  { hueco: '{dias}', explicacion: 'Los días que lleva' },
+  { hueco: '{importe}', explicacion: 'Lo acumulado a hoy' },
+  { hueco: '{sin_cargo}', explicacion: 'Cuántos días le quedan sin cargo' },
+] as const;
+
+/** "le quedan 3 días sin cargo", "le queda 1 día sin cargo" o "hoy es su último día sin cargo". */
+export function textoSinCargo(dias: number): string {
+  const quedan = DIAS_GRACIA - dias;
+  if (quedan <= 0) return 'hoy es su último día sin cargo';
+  if (quedan === 1) return 'le queda 1 día sin cargo';
+  return `le quedan ${quedan} días sin cargo`;
+}
+
+/**
+ * El aviso de un cilindro, armado con el texto que eligió el administrador.
+ *
+ * Usa el de con cargo de 61 días en adelante y el de por vencer de 54 a 60.
+ * Devuelve `null` si el texto lleva el importe y quien mira no lo puede ver: un
+ * aviso con "{importe}" sin completar no se puede mandar.
+ *
+ * Un hueco que no existe —uno mal escrito, como {dia}— queda tal cual, para que
+ * se note en la vista previa.
+ */
+export function textoDelAviso(
+  textos: TextosAviso,
+  datos: {
+    cliente: string;
+    serie: string;
+    fechaEntrega: FechaISO;
+    dias: number;
+    /** `null` si quien mira no puede ver la plata. */
+    importe: number | null;
+  },
+): string | null {
+  const plantilla = datos.dias > DIAS_GRACIA ? textos.conCargo : textos.porVencer;
+  if (datos.importe === null && plantilla.includes('{importe}')) return null;
+
+  const valores: Record<string, string> = {
+    cliente: datos.cliente,
+    serie: datos.serie,
+    desde: formatearFecha(datos.fechaEntrega),
+    dias: String(datos.dias),
+    importe: formatearPesos(datos.importe ?? 0),
+    sin_cargo: textoSinCargo(datos.dias),
+  };
+
+  return plantilla.replace(/\{(\w+)\}/g, (hueco, nombre: string) => valores[nombre] ?? hueco);
 }
 
 /**

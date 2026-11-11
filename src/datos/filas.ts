@@ -9,6 +9,7 @@
 import { parseFechaISO, type FechaISO } from '../dominio/arriendo';
 import type {
   Arriendo,
+  AvisoRegistrado,
   Cilindro,
   Cliente,
   EstadoApp,
@@ -68,6 +69,21 @@ export type FilaMovimiento = {
   creado_en: string;
 };
 
+export type FilaAviso = {
+  id: string;
+  arriendo_id: string;
+  cilindro_id: string;
+  cliente_id: string;
+  dias: number;
+  operador: string;
+  creado_en: string;
+};
+
+export type FilaTextosAviso = {
+  con_cargo: string;
+  por_vencer: string;
+};
+
 export type Filas = {
   clientes: FilaCliente[];
   cilindros: FilaCilindro[];
@@ -75,6 +91,9 @@ export type Filas = {
   tarifas: FilaTarifa[];
   arriendos: FilaArriendo[];
   movimientos: FilaMovimiento[];
+  /** Opcionales: los tests de antes de la etapa D no los traen. */
+  avisos?: FilaAviso[];
+  textosAviso?: FilaTextosAviso | null;
 };
 
 /**
@@ -133,5 +152,31 @@ export function armarEstado(filas: Filas, operador: string): EstadoApp {
       creadoEn: m.creado_en,
     }));
 
-  return { version: 1, operador, clientes, cilindros, arriendos, movimientos };
+  // Del más viejo al más nuevo, igual que los movimientos.
+  const avisos: AvisoRegistrado[] = [...(filas.avisos ?? [])]
+    .sort((a, b) =>
+      a.creado_en === b.creado_en ? a.id.localeCompare(b.id) : a.creado_en < b.creado_en ? -1 : 1,
+    )
+    .map((a) => ({
+      id: a.id,
+      arriendoId: a.arriendo_id,
+      cilindroId: a.cilindro_id,
+      clienteId: a.cliente_id,
+      dias: a.dias,
+      operador: a.operador,
+      creadoEn: a.creado_en,
+    }));
+
+  const textos = filas.textosAviso;
+
+  return {
+    version: 1,
+    operador,
+    clientes,
+    cilindros,
+    arriendos,
+    movimientos,
+    avisos,
+    ...(textos == null ? {} : { textosAviso: { conCargo: textos.con_cargo, porVencer: textos.por_vencer } }),
+  };
 }

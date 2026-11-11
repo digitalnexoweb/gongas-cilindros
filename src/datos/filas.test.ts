@@ -113,6 +113,32 @@ describe('armarEstado', () => {
   });
 });
 
+describe('armarEstado con los avisos de la etapa D', () => {
+  it('trae los avisos ordenados y el texto editado', () => {
+    const filas: Filas = {
+      ...filasDeJoaquin(),
+      avisos: [
+        { id: 'v-2', arriendo_id: 'a-1', cilindro_id: 'c-1', cliente_id: 'k-ancap', dias: 92, operador: 'Joaquín', creado_en: '2026-11-06T15:00:00+00:00' },
+        { id: 'v-1', arriendo_id: 'a-1', cilindro_id: 'c-1', cliente_id: 'k-ancap', dias: 85, operador: 'Ana', creado_en: '2026-10-30T15:00:00+00:00' },
+      ],
+      textosAviso: { con_cargo: 'Hola {cliente} {importe}', por_vencer: 'Hola {cliente}' },
+    };
+
+    const estado = armarEstado(filas, 'Joaquín');
+
+    expect(estado.avisos?.map((a) => [a.operador, a.dias, a.arriendoId])).toEqual([
+      ['Ana', 85, 'a-1'],
+      ['Joaquín', 92, 'a-1'],
+    ]);
+    expect(estado.textosAviso).toEqual({ conCargo: 'Hola {cliente} {importe}', porVencer: 'Hola {cliente}' });
+  });
+
+  it('sin fila de texto, no inventa uno: la app usa el original', () => {
+    const estado = armarEstado({ ...filasDeJoaquin(), textosAviso: null }, 'Joaquín');
+    expect(estado.textosAviso).toBeUndefined();
+  });
+});
+
 describe('armarEstado para un empleado, sin tarifas', () => {
   it('deja la tarifa en null, que no es lo mismo que cero', () => {
     const estado = armarEstado(filasDeEmpleado(), 'Ana');

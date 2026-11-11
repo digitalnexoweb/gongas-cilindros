@@ -17,11 +17,13 @@ export function PantallaAjustes({
   alAbrirEtiquetas,
   alAbrirUsuarios,
   alAbrirTarifas,
+  alAbrirTextoAviso,
 }: {
   alVolver(): void;
   alAbrirEtiquetas(): void;
   alAbrirUsuarios(): void;
   alAbrirTarifas(): void;
+  alAbrirTextoAviso(): void;
 }) {
   const { perfil, estado, puedeVerPlata } = useEstado();
   const { cerrarSesion } = useSesion();
@@ -56,6 +58,11 @@ export function PantallaAjustes({
                 alTocar={alAbrirTarifas}
               />
             )}
+            <Fila
+              titulo="Texto del aviso"
+              detalle="El mensaje de WhatsApp que reciben los clientes"
+              alTocar={alAbrirTextoAviso}
+            />
             <p className="px-4 py-3 text-sm text-tinta-2">
               Los clientes y los cilindros se editan desde su ficha, con el botón Editar.
             </p>

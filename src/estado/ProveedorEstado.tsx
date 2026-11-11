@@ -13,7 +13,7 @@ import * as repositorio from '../datos/repositorio';
 import type { LoteConfirmado } from '../datos/repositorio';
 import type { Perfil } from '../datos/filas';
 import { hoyISO, type FechaISO } from '../dominio/arriendo';
-import type { Cliente, EstadoApp, Tamano, TipoMovimiento } from '../dominio/tipos';
+import type { Cliente, EstadoApp, Tamano, TextosAviso, TipoMovimiento } from '../dominio/tipos';
 
 /**
  * La sesión y la foto del estado.
@@ -64,6 +64,10 @@ type ContextoEstado = {
   editarCliente(id: string, datos: Omit<Cliente, 'id'>): Promise<void>;
   editarCilindro(id: string, cambios: repositorio.CambiosCilindro): Promise<void>;
   cambiarTarifaPorTamano(tamano: Tamano, tarifa: number): Promise<number>;
+  /** Cualquier usuario activo. Recarga para que la fila muestre el aviso. */
+  registrarAviso(arriendoId: string): Promise<void>;
+  /** Solo el administrador. */
+  guardarTextosAviso(textos: TextosAviso): Promise<void>;
 };
 
 const ContextoDeSesion = createContext<ContextoSesion | null>(null);
@@ -221,6 +225,14 @@ export function ProveedorEstado({ children }: { children: ReactNode }) {
         const cambiados = await repositorio.cambiarTarifaPorTamano(tamano, tarifa);
         await recargar();
         return cambiados;
+      },
+      async registrarAviso(arriendoId) {
+        await repositorio.registrarAviso(arriendoId);
+        await recargar();
+      },
+      async guardarTextosAviso(textos) {
+        await repositorio.guardarTextosAviso(textos);
+        await recargar();
       },
     };
   }, [sesion, hoy, recargar]);

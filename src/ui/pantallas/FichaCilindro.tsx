@@ -16,6 +16,7 @@ import { BotonEditar } from '../BotonEditar';
 import { Bloque, Dato } from '../Dato';
 import { EditarCilindro } from '../EditarCilindro';
 import { Encabezado } from '../Encabezado';
+import { cuandoEnFrase } from '../hora';
 import { Importe } from '../Importe';
 import { nombreTamano } from './PantallaCilindros';
 
@@ -42,6 +43,8 @@ export function FichaCilindro({
 
   const vista = vistaCilindro(estado, cilindro, hoy);
   const historial = historialDe(estado, cilindro.id);
+  // Del más nuevo al más viejo, como el historial.
+  const avisos = (estado.avisos ?? []).filter((a) => a.cilindroId === cilindro.id).reverse();
 
   if (editando) {
     return (
@@ -137,6 +140,23 @@ export function FichaCilindro({
                 )}
               </Dato>
             )}
+          </Bloque>
+        )}
+
+        {avisos.length > 0 && (
+          <Bloque titulo={`Avisos por WhatsApp · ${avisos.length}`}>
+            {avisos.map((aviso) => (
+              <div key={aviso.id} className="flex items-baseline justify-between gap-3 px-4 py-3">
+                <span className="min-w-0 truncate text-sm">
+                  <span className="font-semibold">{aviso.operador}</span>
+                  <span className="text-tinta-2">
+                    {' '}
+                    · {clientePorId(estado, aviso.clienteId)?.nombre ?? '—'} · a los {aviso.dias} días
+                  </span>
+                </span>
+                <span className="shrink-0 text-sm text-tinta-2">{cuandoEnFrase(aviso.creadoEn, hoy)}</span>
+              </div>
+            ))}
           </Bloque>
         )}
 

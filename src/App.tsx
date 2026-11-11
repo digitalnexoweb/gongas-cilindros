@@ -15,6 +15,7 @@ import { PantallaEtiquetas } from './ui/pantallas/PantallaEtiquetas';
 import { PantallaIngreso } from './ui/pantallas/PantallaIngreso';
 import { PantallaResumen } from './ui/pantallas/PantallaResumen';
 import { PantallaTarifas } from './ui/pantallas/PantallaTarifas';
+import { PantallaTextoAviso } from './ui/pantallas/PantallaTextoAviso';
 import { PantallaUsuarios } from './ui/pantallas/PantallaUsuarios';
 
 /**
@@ -27,7 +28,8 @@ type Capa =
   | { tipo: 'ajustes' }
   | { tipo: 'etiquetas' }
   | { tipo: 'usuarios' }
-  | { tipo: 'tarifas' };
+  | { tipo: 'tarifas' }
+  | { tipo: 'texto-aviso' };
 
 export function App() {
   return (
@@ -163,8 +165,10 @@ function Armazon() {
           alAbrirEtiquetas={() => abrir({ tipo: 'etiquetas' })}
           alAbrirUsuarios={() => abrir({ tipo: 'usuarios' })}
           alAbrirTarifas={() => abrir({ tipo: 'tarifas' })}
+          alAbrirTextoAviso={() => abrir({ tipo: 'texto-aviso' })}
         />
       )}
+      {capa?.tipo === 'texto-aviso' && <PantallaTextoAviso alVolver={cerrar} />}
       {capa?.tipo === 'etiquetas' && <PantallaEtiquetas alVolver={cerrar} />}
       {capa?.tipo === 'usuarios' && <PantallaUsuarios alVolver={cerrar} />}
       {capa?.tipo === 'tarifas' && <PantallaTarifas alVolver={cerrar} />}
