@@ -2,6 +2,18 @@
 
 Para tener en la mano el día que se lo mostrás a Joaquín.
 
+> **El sistema real ya no es este link.** Está en **https://gongas-cilindros.pages.dev**, con login
+> y la base compartida, y se publica con `npm run deploy`.
+>
+> La demo de abajo quedó congelada en el tag `prototipo-v1`. Para volver a publicarla alguna vez:
+>
+> ```bash
+> git switch --detach prototipo-v1
+> npm run build
+> npx wrangler pages deploy dist --project-name gongas-prototipo
+> git switch main
+> ```
+
 ## El link
 
 **https://gongas-prototipo.pages.dev**

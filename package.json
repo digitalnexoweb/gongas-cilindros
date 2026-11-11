@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "node -e \"console.error('Desactivado: esta versión tiene login y publicarla pisaría la demo de gongas-prototipo.pages.dev. Se publica en la etapa E, en un link nuevo.'); process.exit(1)\"",
+    "deploy": "npm run build && wrangler pages deploy",
     "etiquetas": "node scripts/listado-rotuladora.ts",
     "test": "vitest run",
     "test:watch": "vitest",

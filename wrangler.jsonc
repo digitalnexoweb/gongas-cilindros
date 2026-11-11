@@ -1,6 +1,7 @@
 {
-  // El nombre define la URL: https://gongas-prototipo.pages.dev
-  "name": "gongas-prototipo",
+  // El nombre define la URL: https://gongas-cilindros.pages.dev, el sistema real.
+  // La demo vieja es otro proyecto, gongas-prototipo: ver DEMO.md para volver a publicarla.
+  "name": "gongas-cilindros",
   "compatibility_date": "2026-11-07",
 
   // Con esto alcanza `wrangler pages deploy`, sin repetir la carpeta ni el nombre.
