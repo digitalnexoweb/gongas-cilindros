@@ -64,6 +64,7 @@ export function FichaCliente({ clienteId, alVolver }: { clienteId: string; alVol
         <Bloque titulo="El cliente">
           <Dato etiqueta="Documento">{cliente.documento}</Dato>
           <Dato etiqueta="Teléfono">{cliente.telefono}</Dato>
+          <Dato etiqueta="Mail">{cliente.email === undefined || cliente.email === '' ? '—' : cliente.email}</Dato>
         </Bloque>
 
         <Bloque titulo={`Cilindros en su poder · ${cilindros.length}`}>

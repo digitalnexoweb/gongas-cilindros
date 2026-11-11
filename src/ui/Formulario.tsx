@@ -22,7 +22,7 @@ export function Campo({
   etiqueta: string;
   valor: string;
   alCambiar(nuevo: string): void;
-  modo?: 'numeric' | 'tel' | 'decimal';
+  modo?: 'numeric' | 'tel' | 'decimal' | 'email';
   ayuda?: string;
   autoFoco?: boolean;
   /** Un texto fijo a la izquierda, como "$". */
@@ -40,6 +40,7 @@ export function Campo({
         <input
           type="text"
           inputMode={modo}
+          autoCapitalize={modo === 'email' ? 'none' : undefined}
           autoFocus={autoFoco}
           value={valor}
           onChange={(e) => alCambiar(e.target.value)}

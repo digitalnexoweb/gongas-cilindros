@@ -12,7 +12,8 @@
     "etiquetas": "node scripts/listado-rotuladora.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "funcion:armar": "node scripts/armar-funcion.ts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.16",

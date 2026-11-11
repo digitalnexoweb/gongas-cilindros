@@ -42,6 +42,8 @@ export type Cliente = {
   documento: string;
   /** Con código de país, para el link de WhatsApp. */
   telefono: string;
+  /** Para los avisos automáticos. Vacío o ausente: no se le avisa por mail. */
+  email?: string;
 };
 
 /** Se abre con cada entrega y se cierra con la devolución. */
@@ -84,6 +86,12 @@ export type AvisoRegistrado = {
   clienteId: string;
   /** Los días que llevaba el arriendo cuando se avisó. */
   dias: number;
+  /** Por dónde salió. Los avisos de antes de los mails son todos de WhatsApp. */
+  canal: 'whatsapp' | 'mail';
+  etapa: 'por_vencer' | 'con_cargo';
+  /** A qué dirección salió un mail. `null` en WhatsApp. */
+  destino: string | null;
+  /** Quién avisó. En los mails, "Automático". */
   operador: string;
   /** El momento exacto, como lo guarda la base (ISO, en UTC). */
   creadoEn: string;
@@ -99,6 +107,8 @@ export type TextosAviso = {
   conCargo: string;
   /** De 54 a 60: avisa cuánto le queda sin cargo. */
   porVencer: string;
+  /** A quién le llega la copia oculta de cada mail automático. Vacío: a nadie. */
+  copiaMail?: string;
 };
 
 /** Todo lo que se guarda, en una sola pieza. */

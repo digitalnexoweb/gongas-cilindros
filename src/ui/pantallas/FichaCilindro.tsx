@@ -144,14 +144,17 @@ export function FichaCilindro({
         )}
 
         {avisos.length > 0 && (
-          <Bloque titulo={`Avisos por WhatsApp · ${avisos.length}`}>
+          <Bloque titulo={`Avisos · ${avisos.length}`}>
             {avisos.map((aviso) => (
               <div key={aviso.id} className="flex items-baseline justify-between gap-3 px-4 py-3">
                 <span className="min-w-0 truncate text-sm">
-                  <span className="font-semibold">{aviso.operador}</span>
+                  <span className="font-semibold">
+                    {aviso.canal === 'mail' ? 'Mail automático' : `WhatsApp · ${aviso.operador}`}
+                  </span>
                   <span className="text-tinta-2">
                     {' '}
-                    · {clientePorId(estado, aviso.clienteId)?.nombre ?? '—'} · a los {aviso.dias} días
+                    · {aviso.canal === 'mail' ? aviso.destino : (clientePorId(estado, aviso.clienteId)?.nombre ?? '—')} · a
+                    los {aviso.dias} días
                   </span>
                 </span>
                 <span className="shrink-0 text-sm text-tinta-2">{cuandoEnFrase(aviso.creadoEn, hoy)}</span>

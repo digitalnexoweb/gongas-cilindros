@@ -121,7 +121,7 @@ describe('armarEstado con los avisos de la etapa D', () => {
         { id: 'v-2', arriendo_id: 'a-1', cilindro_id: 'c-1', cliente_id: 'k-ancap', dias: 92, operador: 'Joaquín', creado_en: '2026-11-06T15:00:00+00:00' },
         { id: 'v-1', arriendo_id: 'a-1', cilindro_id: 'c-1', cliente_id: 'k-ancap', dias: 85, operador: 'Ana', creado_en: '2026-10-30T15:00:00+00:00' },
       ],
-      textosAviso: { con_cargo: 'Hola {cliente} {importe}', por_vencer: 'Hola {cliente}' },
+      textosAviso: { con_cargo: 'Hola {cliente} {importe}', por_vencer: 'Hola {cliente}', copia_mail: 'info@gongas.test' },
     };
 
     const estado = armarEstado(filas, 'Joaquín');
@@ -130,7 +130,16 @@ describe('armarEstado con los avisos de la etapa D', () => {
       ['Ana', 85, 'a-1'],
       ['Joaquín', 92, 'a-1'],
     ]);
-    expect(estado.textosAviso).toEqual({ conCargo: 'Hola {cliente} {importe}', porVencer: 'Hola {cliente}' });
+    expect(estado.textosAviso).toEqual({
+      conCargo: 'Hola {cliente} {importe}',
+      porVencer: 'Hola {cliente}',
+      copiaMail: 'info@gongas.test',
+    });
+    // Un aviso de antes de los mails se lee como WhatsApp, con su etapa según los días.
+    expect(estado.avisos?.map((a) => [a.canal, a.etapa])).toEqual([
+      ['whatsapp', 'con_cargo'],
+      ['whatsapp', 'con_cargo'],
+    ]);
   });
 
   it('sin fila de texto, no inventa uno: la app usa el original', () => {

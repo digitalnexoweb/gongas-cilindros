@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 
 import { diasEntre, formatearFecha, formatearPesos, type FechaISO } from '../../dominio/arriendo';
 import { vistaAvisos, type CalculoVisible } from '../../dominio/consultas';
+import { etapaDeAviso, proximoMail } from '../../dominio/avisosPorMail';
 import { TEXTOS_AVISO_ORIGINALES, linkWhatsApp, textoDelAviso } from '../../dominio/mensajes';
 import type { AvisoRegistrado, Cliente, TextosAviso } from '../../dominio/tipos';
 import { useEstado } from '../../estado/ProveedorEstado';
@@ -75,7 +76,10 @@ export function PantallaAvisos() {
                   arriendoId={vista.arriendo.id}
                   fechaEntrega={vista.arriendo.fechaEntrega}
                   calculo={vista.calculo}
-                  ultimo={ultimoAvisoDe(estado.avisos, vista.arriendo.id)}
+                  ultimo={ultimoAvisoDe(estado.avisos, vista.arriendo.id, 'whatsapp')}
+                  mails={(estado.avisos ?? []).filter(
+                    (a) => a.arriendoId === vista.arriendo?.id && a.canal === 'mail',
+                  )}
                   textos={estado.textosAviso ?? TEXTOS_AVISO_ORIGINALES}
                   hoy={hoy}
                 />
@@ -96,9 +100,13 @@ export function PantallaAvisos() {
 /** Cuántos días tiene que pasar para que volver a avisar no parezca repetido. */
 const DIAS_PARA_REAVISAR = 7;
 
-function ultimoAvisoDe(avisos: AvisoRegistrado[] | undefined, arriendoId: string): AvisoRegistrado | null {
+function ultimoAvisoDe(
+  avisos: AvisoRegistrado[] | undefined,
+  arriendoId: string,
+  canal: AvisoRegistrado['canal'],
+): AvisoRegistrado | null {
   // Vienen del más viejo al más nuevo.
-  return (avisos ?? []).filter((a) => a.arriendoId === arriendoId).at(-1) ?? null;
+  return (avisos ?? []).filter((a) => a.arriendoId === arriendoId && a.canal === canal).at(-1) ?? null;
 }
 
 function FilaAviso({
@@ -108,6 +116,7 @@ function FilaAviso({
   fechaEntrega,
   calculo,
   ultimo,
+  mails,
   textos,
   hoy,
 }: {
@@ -116,7 +125,10 @@ function FilaAviso({
   arriendoId: string;
   fechaEntrega: FechaISO;
   calculo: CalculoVisible;
+  /** El último aviso por WhatsApp. */
   ultimo: AvisoRegistrado | null;
+  /** Los mails automáticos de este arriendo, del más viejo al más nuevo. */
+  mails: AvisoRegistrado[];
   textos: TextosAviso;
   hoy: FechaISO;
 }) {
@@ -132,6 +144,8 @@ function FilaAviso({
     dias: calculo.dias,
     importe: calculo.importe,
   });
+
+  const estadoMail = textoDelMail({ email: cliente.email ?? '', dias: calculo.dias, mails, hoy });
 
   const momento = ultimo === null ? null : enMontevideo(ultimo.creadoEn);
   const reciente = momento !== null && diasEntre(momento.fecha, hoy) < DIAS_PARA_REAVISAR;
@@ -152,11 +166,21 @@ function FilaAviso({
         <Importe valor={calculo.importe} />
       </div>
 
-      <p className={`mt-2 text-sm ${ultimo === null ? 'text-tinta-2' : 'font-medium text-gracia'}`}>
-        {ultimo === null
-          ? 'Sin avisar todavía'
-          : `Avisado ${cuandoEnFrase(ultimo.creadoEn, hoy)} por ${ultimo.operador}`}
-      </p>
+      {/* Los dos canales, por separado: que haya salido el mail no dice nada del WhatsApp. */}
+      <dl className="mt-2 space-y-0.5 text-sm">
+        <div className="flex gap-1.5">
+          <dt className="shrink-0 text-tinta-2">WhatsApp:</dt>
+          <dd className={ultimo === null ? 'text-tinta-2' : 'font-medium text-gracia'}>
+            {ultimo === null
+              ? 'sin avisar'
+              : `avisado ${cuandoEnFrase(ultimo.creadoEn, hoy)} por ${ultimo.operador}`}
+          </dd>
+        </div>
+        <div className="flex gap-1.5">
+          <dt className="shrink-0 text-tinta-2">Mail:</dt>
+          <dd className={estadoMail.enviado ? 'font-medium text-gracia' : 'text-tinta-2'}>{estadoMail.texto}</dd>
+        </div>
+      </dl>
 
       {texto === null ? (
         <p className="mt-3 text-sm text-tinta-2">Este aviso lleva el importe: lo manda el administrador.</p>
@@ -199,4 +223,33 @@ function FilaAviso({
       )}
     </li>
   );
+}
+
+/** Lo que dice la fila sobre el mail automático. */
+function textoDelMail(datos: {
+  email: string;
+  dias: number;
+  mails: AvisoRegistrado[];
+  hoy: FechaISO;
+}): { texto: string; enviado: boolean } {
+  const etapa = etapaDeAviso(datos.dias);
+  const deEstaEtapa = datos.mails.filter((m) => m.etapa === etapa).at(-1) ?? datos.mails.at(-1) ?? null;
+
+  switch (
+    proximoMail({ email: datos.email, dias: datos.dias, etapasEnviadas: datos.mails.map((m) => m.etapa) })
+  ) {
+    case 'sin_mail':
+      return { texto: 'sin mail cargado, no se avisa automático', enviado: false };
+    case 'sale_a_las_9': {
+      const antes = deEstaEtapa === null ? '' : ` (el anterior salió ${cuandoEnFrase(deEstaEtapa.creadoEn, datos.hoy)})`;
+      return { texto: `sale automático a las 9:00${antes}`, enviado: false };
+    }
+    case 'ya_salio':
+      return {
+        texto: `enviado automático ${cuandoEnFrase(deEstaEtapa?.creadoEn ?? '', datos.hoy)} a ${deEstaEtapa?.destino ?? datos.email}`,
+        enviado: true,
+      };
+    case 'nada':
+      return { texto: 'todavía no corresponde', enviado: false };
+  }
 }

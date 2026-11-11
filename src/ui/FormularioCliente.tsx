@@ -25,11 +25,13 @@ export function FormularioCliente({
   const [tipo, setTipo] = useState<TipoCliente>(inicial?.tipo ?? 'empresa');
   const [documento, setDocumento] = useState(inicial?.documento ?? '');
   const [telefono, setTelefono] = useState(inicial?.telefono ?? '+598');
+  const [email, setEmail] = useState(inicial?.email ?? '');
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const listo = nombre.trim() !== '' && !guardando;
+  const emailValido = email.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const listo = nombre.trim() !== '' && emailValido && !guardando;
 
   return (
     <form
@@ -44,6 +46,7 @@ export function FormularioCliente({
           tipo,
           documento: documento.trim(),
           telefono: telefono.trim(),
+          email: email.trim(),
         })
           .catch((falla: unknown) => {
             setError(falla instanceof Error ? falla.message : 'No se pudo guardar el cliente.');
@@ -78,6 +81,17 @@ export function FormularioCliente({
           alCambiar={setTelefono}
           modo="tel"
           ayuda="Con el +598, para que el aviso por WhatsApp llegue."
+        />
+        <Campo
+          etiqueta="Mail (opcional)"
+          valor={email}
+          alCambiar={setEmail}
+          modo="email"
+          ayuda={
+            emailValido
+              ? 'Para los avisos automáticos. Sin mail, a este cliente solo se le avisa por WhatsApp.'
+              : 'Eso no parece un mail. Revisalo o dejalo vacío.'
+          }
         />
 
         <ErrorDeFormulario mensaje={error} />

@@ -142,7 +142,7 @@ async function traerTodo<T>(tabla: string, columnas: string, orden: string[]): P
 /** La foto completa del estado, tal como la base se la entrega a este usuario. */
 export async function cargarEstado(perfil: Perfil): Promise<EstadoApp> {
   const [clientes, cilindros, tarifas, arriendos, movimientos, avisos, textos] = await Promise.all([
-    traerTodo<FilaCliente>('clientes', 'id, nombre, tipo, documento, telefono', ['nombre', 'id']),
+    traerTodo<FilaCliente>('clientes', 'id, nombre, tipo, documento, telefono, email', ['nombre', 'id']),
     traerTodo<FilaCilindro>('cilindros', 'id, serie, tipo_gas, tamano, activo', ['serie']),
     // A un empleado esto le vuelve vacío: la base no le entrega tarifas.
     traerTodo<FilaTarifa>('tarifas', 'cilindro_id, tarifa_mensual', ['cilindro_id']),
@@ -158,10 +158,10 @@ export async function cargarEstado(perfil: Perfil): Promise<EstadoApp> {
     ),
     traerTodo<FilaAviso>(
       'avisos',
-      'id, arriendo_id, cilindro_id, cliente_id, dias, operador, creado_en',
+      'id, arriendo_id, cilindro_id, cliente_id, dias, canal, etapa, destino, operador, creado_en',
       ['creado_en', 'id'],
     ),
-    supabase.from('textos_aviso').select('con_cargo, por_vencer').maybeSingle(),
+    supabase.from('textos_aviso').select('con_cargo, por_vencer, copia_mail').maybeSingle(),
   ]);
 
   if (textos.error !== null) throw falla(textos.error);
@@ -244,6 +244,7 @@ export async function altaCliente(datos: Omit<Cliente, 'id'>): Promise<string> {
       tipo: datos.tipo,
       documento: datos.documento,
       telefono: datos.telefono,
+      email: datos.email ?? '',
     })
     .select('id')
     .single();
@@ -306,6 +307,7 @@ export async function editarCliente(id: string, datos: Omit<Cliente, 'id'>): Pro
       tipo: datos.tipo,
       documento: datos.documento,
       telefono: datos.telefono,
+      email: datos.email ?? '',
     })
     .eq('id', id)
     .select('id');
@@ -378,6 +380,7 @@ export async function guardarTextosAviso(textos: TextosAviso): Promise<void> {
     .update({
       con_cargo: textos.conCargo,
       por_vencer: textos.porVencer,
+      copia_mail: (textos.copiaMail ?? '').trim(),
       actualizado_en: new Date().toISOString(),
     })
     .eq('id', true)

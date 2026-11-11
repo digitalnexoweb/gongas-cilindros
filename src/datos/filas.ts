@@ -34,6 +34,7 @@ export type FilaCliente = {
   tipo: TipoCliente;
   documento: string;
   telefono: string;
+  email?: string;
 };
 
 export type FilaCilindro = {
@@ -75,6 +76,9 @@ export type FilaAviso = {
   cilindro_id: string;
   cliente_id: string;
   dias: number;
+  canal?: 'whatsapp' | 'mail';
+  etapa?: 'por_vencer' | 'con_cargo';
+  destino?: string | null;
   operador: string;
   creado_en: string;
 };
@@ -82,6 +86,7 @@ export type FilaAviso = {
 export type FilaTextosAviso = {
   con_cargo: string;
   por_vencer: string;
+  copia_mail?: string;
 };
 
 export type Filas = {
@@ -115,6 +120,7 @@ export function armarEstado(filas: Filas, operador: string): EstadoApp {
     tipo: c.tipo,
     documento: c.documento,
     telefono: c.telefono,
+    email: c.email ?? '',
   }));
 
   const cilindros: Cilindro[] = filas.cilindros.map((c) => ({
@@ -163,6 +169,9 @@ export function armarEstado(filas: Filas, operador: string): EstadoApp {
       cilindroId: a.cilindro_id,
       clienteId: a.cliente_id,
       dias: a.dias,
+      canal: a.canal ?? 'whatsapp',
+      etapa: a.etapa ?? (a.dias > 60 ? 'con_cargo' : 'por_vencer'),
+      destino: a.destino ?? null,
       operador: a.operador,
       creadoEn: a.creado_en,
     }));
@@ -177,6 +186,12 @@ export function armarEstado(filas: Filas, operador: string): EstadoApp {
     arriendos,
     movimientos,
     avisos,
-    ...(textos == null ? {} : { textosAviso: { conCargo: textos.con_cargo, porVencer: textos.por_vencer } }),
+    ...(textos == null ? {} : {
+          textosAviso: {
+            conCargo: textos.con_cargo,
+            porVencer: textos.por_vencer,
+            copiaMail: textos.copia_mail ?? '',
+          },
+        }),
   };
 }

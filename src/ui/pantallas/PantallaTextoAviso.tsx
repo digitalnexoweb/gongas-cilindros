@@ -5,7 +5,7 @@ import { HUECOS_AVISO, TEXTOS_AVISO_ORIGINALES, textoDelAviso } from '../../domi
 import type { TextosAviso } from '../../dominio/tipos';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { Encabezado } from '../Encabezado';
-import { ErrorDeFormulario, claseBotonPrincipal, claseBotonSecundario } from '../Formulario';
+import { Campo, ErrorDeFormulario, claseBotonPrincipal, claseBotonSecundario } from '../Formulario';
 
 const HUECOS_VALIDOS = new Set(HUECOS_AVISO.map((h) => h.hueco));
 
@@ -28,8 +28,13 @@ export function PantallaTextoAviso({ alVolver }: { alVolver(): void }) {
   const [error, setError] = useState<string | null>(null);
   const [hecho, setHecho] = useState(false);
 
-  const cambiado = textos.conCargo !== guardado.conCargo || textos.porVencer !== guardado.porVencer;
-  const vacio = textos.conCargo.trim() === '' || textos.porVencer.trim() === '';
+  const copiaValida =
+    (textos.copiaMail ?? '').trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((textos.copiaMail ?? '').trim());
+  const cambiado =
+    textos.conCargo !== guardado.conCargo ||
+    textos.porVencer !== guardado.porVencer ||
+    (textos.copiaMail ?? '') !== (guardado.copiaMail ?? '');
+  const vacio = textos.conCargo.trim() === '' || textos.porVencer.trim() === '' || !copiaValida;
   const esOriginal =
     textos.conCargo === TEXTOS_AVISO_ORIGINALES.conCargo &&
     textos.porVencer === TEXTOS_AVISO_ORIGINALES.porVencer;
@@ -47,7 +52,11 @@ export function PantallaTextoAviso({ alVolver }: { alVolver(): void }) {
 
         setGuardando(true);
         setError(null);
-        guardarTextosAviso({ conCargo: textos.conCargo.trim(), porVencer: textos.porVencer.trim() })
+        guardarTextosAviso({
+          conCargo: textos.conCargo.trim(),
+          porVencer: textos.porVencer.trim(),
+          copiaMail: (textos.copiaMail ?? '').trim(),
+        })
           .then(() => setHecho(true))
           .catch((falla: unknown) => {
             setError(falla instanceof Error ? falla.message : 'No se pudo guardar el texto.');
@@ -61,6 +70,10 @@ export function PantallaTextoAviso({ alVolver }: { alVolver(): void }) {
         <p className="text-sm text-tinta-2">
           Lo que está entre llaves la app lo completa con los datos de cada cliente al avisar. Tocá un
           hueco para agregarlo donde está el cursor.
+        </p>
+        <p className="text-sm text-tinta-2">
+          Es el mismo texto para <strong className="text-tinta">WhatsApp y para el mail automático</strong>.
+          El mail sale con el asunto «GONGAS — aviso del cilindro» y la serie.
         </p>
 
         <EditorDeTexto
@@ -101,6 +114,24 @@ export function PantallaTextoAviso({ alVolver }: { alVolver(): void }) {
           })}
         />
 
+        <section className="space-y-2 rounded-2xl border border-linea bg-white p-4">
+          <h2 className="font-titulo text-xl font-bold">Copia de los mails</h2>
+          <Campo
+            etiqueta="Mandar copia oculta a"
+            valor={textos.copiaMail ?? ''}
+            alCambiar={(v) => {
+              setTextos((t) => ({ ...t, copiaMail: v }));
+              setHecho(false);
+            }}
+            modo="email"
+            ayuda={
+              copiaValida
+                ? 'Le llega cada mail automático que sale, sin que el cliente lo vea. Vacío: a nadie.'
+                : 'Eso no parece un mail. Revisalo o dejalo vacío.'
+            }
+          />
+        </section>
+
         <ErrorDeFormulario mensaje={error} />
         {hecho && (
           <p role="status" className="text-sm font-semibold text-gracia">
@@ -116,7 +147,7 @@ export function PantallaTextoAviso({ alVolver }: { alVolver(): void }) {
             <button
               type="button"
               onClick={() => {
-                setTextos(TEXTOS_AVISO_ORIGINALES);
+                setTextos((t) => ({ ...TEXTOS_AVISO_ORIGINALES, copiaMail: t.copiaMail }));
                 setHecho(false);
               }}
               className={claseBotonSecundario}
