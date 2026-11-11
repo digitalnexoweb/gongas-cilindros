@@ -41,6 +41,14 @@ type ContextoSesion = {
   crearCuenta(nombre: string, mail: string, clave: string): Promise<boolean>;
   cerrarSesion(): Promise<void>;
   reintentar(): void;
+  /** Manda el mail con el link para elegir una contraseña nueva. */
+  pedirNuevaClave(mail: string): Promise<void>;
+  /**
+   * `true` mientras se viene del link de "me olvidé la contraseña": la app
+   * tiene que pedir la nueva antes de cualquier otra cosa.
+   */
+  eligiendoNuevaClave: boolean;
+  elegirNuevaClave(nueva: string): Promise<void>;
 };
 
 type ContextoEstado = {
@@ -56,10 +64,17 @@ type ContextoEstado = {
     tipo: TipoMovimiento,
     series: string[],
     clienteId: string | null,
+    /** El gas de cada serie, en el mismo orden. Solo en las entregas. */
+    gases?: (string | null)[],
   ): Promise<LoteConfirmado>;
   /** Da de alta un cliente, recarga y devuelve su id. */
   altaCliente(datos: Omit<Cliente, 'id'>): Promise<string>;
-  altaCilindro(serie: string, tamano: Tamano): Promise<void>;
+  altaCilindro(serie: string, tamano: Tamano, tipoGas?: string): Promise<void>;
+  /** Cualquier usuario activo: es un dato físico del cilindro. */
+  corregirTamano(serie: string, tamano: Tamano): Promise<void>;
+  /** Solo el administrador. */
+  agregarTipoGas(nombre: string, orden: number): Promise<void>;
+  cambiarTipoGas(nombre: string, activo: boolean): Promise<void>;
   /** Solo el administrador; la base lo rechaza para los demás. Recargan al terminar. */
   editarCliente(id: string, datos: Omit<Cliente, 'id'>): Promise<void>;
   editarCilindro(id: string, cambios: repositorio.CambiosCilindro): Promise<void>;
@@ -86,6 +101,10 @@ export function ProveedorEstado({ children }: { children: ReactNode }) {
   const [sesion, setSesion] = useState<Sesion>({ fase: 'cargando' });
   const [hoy, setHoy] = useState<FechaISO>(() => hoyISO());
   const [intento, setIntento] = useState(0);
+  const [eligiendoNuevaClave, setEligiendoNuevaClave] = useState(false);
+
+  // ── Si se abrió la app desde el link de "me olvidé la contraseña".
+  useEffect(() => repositorio.alVolverDelLinkDeClave(() => setEligiendoNuevaClave(true)), []);
 
   // Si llegan dos cargas cruzadas, vale la que se pidió última.
   const turno = useRef(0);
@@ -186,8 +205,14 @@ export function ProveedorEstado({ children }: { children: ReactNode }) {
       crearCuenta: repositorio.crearCuenta,
       cerrarSesion: repositorio.cerrarSesion,
       reintentar: () => setIntento((n) => n + 1),
+      pedirNuevaClave: repositorio.pedirNuevaClave,
+      eligiendoNuevaClave,
+      async elegirNuevaClave(nueva) {
+        await repositorio.elegirNuevaClave(nueva);
+        setEligiendoNuevaClave(false);
+      },
     }),
-    [sesion],
+    [sesion, eligiendoNuevaClave],
   );
 
   const valorDeEstado = useMemo<ContextoEstado | null>(() => {
@@ -199,8 +224,8 @@ export function ProveedorEstado({ children }: { children: ReactNode }) {
       puedeVerPlata: sesion.perfil.rol === 'admin',
       hoy,
       recargar,
-      async confirmarLote(tipo, series, clienteId) {
-        const lote = await repositorio.confirmarLote(tipo, series, clienteId);
+      async confirmarLote(tipo, series, clienteId, gases) {
+        const lote = await repositorio.confirmarLote(tipo, series, clienteId, gases);
         await recargar();
         return lote;
       },
@@ -209,8 +234,20 @@ export function ProveedorEstado({ children }: { children: ReactNode }) {
         await recargar();
         return id;
       },
-      async altaCilindro(serie, tamano) {
-        await repositorio.altaCilindro(serie, tamano);
+      async altaCilindro(serie, tamano, tipoGas) {
+        await repositorio.altaCilindro(serie, tamano, tipoGas);
+        await recargar();
+      },
+      async corregirTamano(serie, tamano) {
+        await repositorio.corregirTamano(serie, tamano);
+        await recargar();
+      },
+      async agregarTipoGas(nombre, orden) {
+        await repositorio.agregarTipoGas(nombre, orden);
+        await recargar();
+      },
+      async cambiarTipoGas(nombre, activo) {
+        await repositorio.cambiarTipoGas(nombre, activo);
         await recargar();
       },
       async editarCliente(id, datos) {

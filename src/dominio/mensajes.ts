@@ -17,8 +17,10 @@ export function textoComprobante(datos: {
   series: string[];
   cliente: Cliente | null;
   fecha: FechaISO;
+  /** El gas de cada serie, en el mismo orden. Opcional: la demo no lo tiene. */
+  gases?: (string | null)[];
 }): string {
-  const { tipo, series, cliente, fecha } = datos;
+  const { tipo, series, cliente, fecha, gases } = datos;
 
   const titulo = tipo === 'entrega' ? 'Entrega' : 'Devolución';
   const cuantos = series.length === 1 ? '1 cilindro' : `${series.length} cilindros`;
@@ -26,7 +28,10 @@ export function textoComprobante(datos: {
   const lineas = [`GONGAS — ${titulo} del ${formatearFecha(fecha)}`];
   if (cliente !== null) lineas.push(`Cliente: ${cliente.nombre}`);
   lineas.push(`${cuantos}:`);
-  for (const serie of series) lineas.push(`- ${serie}`);
+  series.forEach((serie, i) => {
+    const gas = gases?.[i];
+    lineas.push(gas == null || gas === '' ? `- ${serie}` : `- ${serie} (${gas.toLowerCase()})`);
+  });
 
   return lineas.join('\n');
 }
@@ -84,6 +89,7 @@ export const HUECOS_AVISO = [
   { hueco: '{dias}', explicacion: 'Los días que lleva' },
   { hueco: '{importe}', explicacion: 'Lo acumulado a hoy' },
   { hueco: '{sin_cargo}', explicacion: 'Cuántos días le quedan sin cargo' },
+  { hueco: '{gas}', explicacion: 'El gas con el que salió' },
 ] as const;
 
 /** "le quedan 3 días sin cargo", "le queda 1 día sin cargo" o "hoy es su último día sin cargo". */
@@ -113,6 +119,8 @@ export function textoDelAviso(
     dias: number;
     /** `null` si quien mira no puede ver la plata. */
     importe: number | null;
+    /** El gas con el que salió. Sin dato, el hueco queda vacío. */
+    gas?: string | null;
   },
 ): string | null {
   const plantilla = datos.dias > DIAS_GRACIA ? textos.conCargo : textos.porVencer;
@@ -125,6 +133,7 @@ export function textoDelAviso(
     dias: String(datos.dias),
     importe: formatearPesos(datos.importe ?? 0),
     sin_cargo: textoSinCargo(datos.dias),
+    gas: (datos.gas ?? '').toLowerCase(),
   };
 
   return plantilla.replace(/\{(\w+)\}/g, (hueco, nombre: string) => valores[nombre] ?? hueco);

@@ -18,12 +18,16 @@ export function PantallaAjustes({
   alAbrirUsuarios,
   alAbrirTarifas,
   alAbrirTextoAviso,
+  alAbrirTiposGas,
+  alAbrirCambiarClave,
 }: {
   alVolver(): void;
   alAbrirEtiquetas(): void;
   alAbrirUsuarios(): void;
   alAbrirTarifas(): void;
   alAbrirTextoAviso(): void;
+  alAbrirTiposGas(): void;
+  alAbrirCambiarClave(): void;
 }) {
   const { perfil, estado, puedeVerPlata } = useEstado();
   const { cerrarSesion } = useSesion();
@@ -60,9 +64,10 @@ export function PantallaAjustes({
             )}
             <Fila
               titulo="Texto del aviso"
-              detalle="El mensaje de WhatsApp que reciben los clientes"
+              detalle="El mensaje de WhatsApp y de mail que reciben los clientes"
               alTocar={alAbrirTextoAviso}
             />
+            <Fila titulo="Tipos de gas" detalle="Los que se eligen al entregar" alTocar={alAbrirTiposGas} />
             <p className="px-4 py-3 text-sm text-tinta-2">
               Los clientes y los cilindros se editan desde su ficha, con el botón Editar.
             </p>
@@ -71,7 +76,8 @@ export function PantallaAjustes({
 
         <Bloque titulo="Tu cuenta">
           <Dato etiqueta="Conectado como">{perfil.nombre}</Dato>
-          <Dato etiqueta="Rol">{esAdmin ? 'Administrador' : 'Empleado'}</Dato>
+          <Dato etiqueta="Rol">{esAdmin ? 'Administrador' : 'Operario'}</Dato>
+          <Fila titulo="Cambiar la contraseña" detalle="Te pide la actual y la nueva" alTocar={alAbrirCambiarClave} />
 
           <div className="p-4">
             <button type="button" onClick={() => void cerrarSesion()} className={claseBotonSecundario}>

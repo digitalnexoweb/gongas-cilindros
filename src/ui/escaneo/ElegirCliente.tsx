@@ -53,6 +53,12 @@ export function ElegirCliente({
                 {cliente.tipo === 'empresa' ? 'Empresa' : 'Particular'}
                 {cliente.documento !== '' && ` · ${cliente.documento}`}
               </span>
+              {(cliente.direccion ?? '') !== '' && (
+                <span className="mt-0.5 block truncate text-sm text-tinta-2">
+                  {cliente.direccion}
+                  {(cliente.ciudad ?? '') !== '' && `, ${cliente.ciudad}`}
+                </span>
+              )}
             </button>
           </li>
         ))}

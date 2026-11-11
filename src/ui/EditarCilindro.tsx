@@ -28,7 +28,8 @@ export function EditarCilindro({
   enUnCliente: boolean;
   alVolver(): void;
 }) {
-  const { editarCilindro } = useEstado();
+  const { estado, editarCilindro } = useEstado();
+  const gases = (estado.tiposGas ?? []).filter((g) => g.activo).map((g) => g.nombre);
 
   const [tamano, setTamano] = useState<Tamano>(cilindro.tamano);
   const [tipoGas, setTipoGas] = useState(cilindro.tipoGas);
@@ -81,7 +82,24 @@ export function EditarCilindro({
           }}
         />
 
-        <Campo etiqueta="Tipo de gas" valor={tipoGas} alCambiar={setTipoGas} />
+        <label className="block">
+          <span className="block text-sm font-medium text-tinta-2">Último gas</span>
+          <select
+            value={tipoGas}
+            onChange={(e) => setTipoGas(e.target.value)}
+            className="mt-1.5 h-12 w-full rounded-[15px] border-[1.5px] border-linea-fuerte bg-white px-3 text-base"
+          >
+            {/* El que tiene, aunque ya no se ofrezca, más los de la lista. */}
+            {[...new Set([tipoGas, ...gases])].map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-sm text-tinta-2">
+            El que se propone la próxima vez que se entregue. En cada entrega se puede elegir otro.
+          </span>
+        </label>
 
         <Campo
           etiqueta="Tarifa mensual"

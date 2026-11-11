@@ -34,6 +34,8 @@ export type DatosAvisosPorMail = {
     fecha_entrega: FechaISO;
     /** `numeric` puede llegar como texto. `null` si el cilindro no tiene tarifa. */
     tarifa_mensual: number | string | null;
+    /** El gas con el que salió. Falta en los datos de antes de la migración 0013. */
+    tipo_gas?: string | null;
     etapas_enviadas: EtapaAviso[];
   }[];
 };
@@ -102,6 +104,7 @@ export function mailsPendientes(datos: DatosAvisosPorMail): MailDeAviso[] {
       fechaEntrega: a.fecha_entrega,
       dias,
       importe,
+      gas: a.tipo_gas ?? null,
     });
     // Sin tarifa no hay importe que poner: mejor no mandar que mandar "{importe}".
     if (texto === null) continue;

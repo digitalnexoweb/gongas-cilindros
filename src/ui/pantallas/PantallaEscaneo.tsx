@@ -97,7 +97,23 @@ export function PantallaEscaneo({
    */
   alCambiarFlujo(enFlujo: boolean): void;
 }) {
-  const { estado, perfil, hoy, confirmarLote } = useEstado();
+  const { estado, perfil, hoy, confirmarLote, corregirTamano } = useEstado();
+
+  // Los gases que se ofrecen al entregar, en el orden de la lista.
+  const gasesActivos = useMemo(() => {
+    const lista = (estado.tiposGas ?? []).filter((g) => g.activo).map((g) => g.nombre);
+    return lista.length > 0 ? lista : ['Acetileno'];
+  }, [estado.tiposGas]);
+  // El gas elegido para cada serie en este lote.
+  const [gases, setGases] = useState<Record<string, string>>({});
+
+  /** El gas de una fila: el elegido, o el último con el que salió ese cilindro. */
+  function gasDe(item: ItemLote): string {
+    const elegido = gases[item.serie];
+    if (elegido !== undefined) return elegido;
+    const ultimo = gasesActivos.find((g) => g.toLowerCase() === (item.tipoGas ?? '').toLowerCase());
+    return ultimo ?? gasesActivos[0] ?? 'Acetileno';
+  }
 
   const [paso, setPaso] = useState<Paso>({ nombre: 'modo' });
   const [series, setSeries] = useState<string[]>([]);
@@ -156,6 +172,7 @@ export function PantallaEscaneo({
 
   function empezar(tipo: TipoMovimiento) {
     setSeries([]);
+    setGases({});
     setAviso(null);
     setSerieManual('');
     setErrorAlGrabar(null);
@@ -185,7 +202,12 @@ export function PantallaEscaneo({
     setErrorAlGrabar(null);
 
     try {
-      const lote = await confirmarLote(tipo, series, clienteId);
+      const lote = await confirmarLote(
+        tipo,
+        series,
+        clienteId,
+        tipo === 'entrega' ? items.map((i) => (i.conocido ? gasDe(i) : null)) : undefined,
+      );
       setPaso({ nombre: 'comprobante', lote, tipo, clienteId });
     } catch (error) {
       // El lote queda en pantalla tal cual: no se pierde lo escaneado.
@@ -327,45 +349,43 @@ export function PantallaEscaneo({
           </p>
         )}
 
+        {/* Un gas para todo el lote de un toque; después se cambia el que haga falta. */}
+        {n > 1 && paso.tipo === 'entrega' && gasesActivos.length > 1 && (
+          <label className="mt-3 flex items-center gap-2 text-sm font-medium text-tinta-2">
+            <span className="shrink-0">Todos con</span>
+            <select
+              value=""
+              onChange={(e) => {
+                const gas = e.target.value;
+                if (gas === '') return;
+                setGases(Object.fromEntries(items.map((i) => [i.serie, gas])));
+              }}
+              className="h-11 min-w-0 flex-1 rounded-[15px] border-[1.5px] border-linea-fuerte bg-white px-3 text-base text-tinta"
+            >
+              <option value="">elegí un gas…</option>
+              {gasesActivos.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         {n > 0 && (
           <ul className="mt-3 divide-y divide-linea rounded-2xl border border-linea bg-white">
             {[...items].reverse().map((item) => (
-              <li key={item.serie} className="flex items-center gap-2 py-2 pr-1 pl-4">
-                <div className="min-w-0 flex-1">
-                  <span className="font-mono text-[17px] font-bold">{item.serie}</span>
-
-                  {item.aviso !== null ? (
-                    <span className="mt-0.5 flex items-center gap-1 text-sm font-medium text-vencer">
-                      <Alerta className="size-3.5 shrink-0" trazo={2.6} />
-                      {item.aviso}
-                    </span>
-                  ) : (
-                    <span className="mt-0.5 block text-sm text-tinta-2">
-                      {item.tamano === 'grande' ? 'Grande' : 'Chico'}
-                      {item.tipoGas === null ? '' : ` · ${item.tipoGas}`}
-                    </span>
-                  )}
-                </div>
-
-                {!item.conocido && (
-                  <button
-                    type="button"
-                    onClick={() => setADarDeAlta(item.serie)}
-                    className="h-11 shrink-0 rounded-xl border border-vencer-borde bg-vencer-suave px-3 text-sm font-semibold text-vencer"
-                  >
-                    Dar de alta
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setSeries((xs) => xs.filter((s) => s !== item.serie))}
-                  aria-label={`Sacar ${item.serie} del lote`}
-                  className="flex size-11 shrink-0 items-center justify-center rounded-xl text-tinta-3 active:bg-fondo"
-                >
-                  <Cruz className="size-5" />
-                </button>
-              </li>
+              <FilaDelLote
+                key={item.serie}
+                item={item}
+                entrega={paso.tipo === 'entrega'}
+                gas={gasDe(item)}
+                gases={gasesActivos}
+                alCambiarGas={(gas) => setGases((xs) => ({ ...xs, [item.serie]: gas }))}
+                alCorregirTamano={(tamano) => corregirTamano(item.serie, tamano)}
+                alDarDeAlta={() => setADarDeAlta(item.serie)}
+                alSacar={() => setSeries((xs) => xs.filter((s) => s !== item.serie))}
+              />
             ))}
           </ul>
         )}
@@ -432,7 +452,12 @@ export function PantallaEscaneo({
       </div>
 
       {aDarDeAlta !== null && (
-        <AltaCilindro serie={aDarDeAlta} alCerrar={() => setADarDeAlta(null)} />
+        <AltaCilindro
+          serie={aDarDeAlta}
+          gases={gasesActivos}
+          alCerrar={() => setADarDeAlta(null)}
+          alCrear={(gas) => setGases((xs) => ({ ...xs, [aDarDeAlta]: gas }))}
+        />
       )}
     </div>
   );
@@ -567,5 +592,120 @@ function Inicio({
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * Una fila del lote. El tamaño se corrige tocándolo (queda para siempre en el
+ * cilindro); el gas se elige para esta entrega.
+ */
+function FilaDelLote({
+  item,
+  entrega,
+  gas,
+  gases,
+  alCambiarGas,
+  alCorregirTamano,
+  alDarDeAlta,
+  alSacar,
+}: {
+  item: ItemLote;
+  entrega: boolean;
+  gas: string;
+  gases: string[];
+  alCambiarGas(gas: string): void;
+  alCorregirTamano(tamano: Tamano): Promise<void>;
+  alDarDeAlta(): void;
+  alSacar(): void;
+}) {
+  const [corrigiendo, setCorrigiendo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function corregir(tamano: Tamano) {
+    if (corrigiendo || tamano === item.tamano) return;
+    setCorrigiendo(true);
+    setError(null);
+    alCorregirTamano(tamano)
+      .catch((falla: unknown) => setError(falla instanceof Error ? falla.message : 'No se pudo corregir.'))
+      .finally(() => setCorrigiendo(false));
+  }
+
+  return (
+    <li className="py-2.5 pr-1 pl-4">
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 font-mono text-[17px] font-bold">{item.serie}</span>
+
+        {!item.conocido && (
+          <button
+            type="button"
+            onClick={alDarDeAlta}
+            className="h-11 shrink-0 rounded-xl border border-vencer-borde bg-vencer-suave px-3 text-sm font-semibold text-vencer"
+          >
+            Dar de alta
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={alSacar}
+          aria-label={`Sacar ${item.serie} del lote`}
+          className="flex size-11 shrink-0 items-center justify-center rounded-xl text-tinta-3 active:bg-fondo"
+        >
+          <Cruz className="size-5" />
+        </button>
+      </div>
+
+      {item.aviso !== null && (
+        <span className="flex items-center gap-1 text-sm font-medium text-vencer">
+          <Alerta className="size-3.5 shrink-0" trazo={2.6} />
+          {item.aviso}
+        </span>
+      )}
+
+      {item.conocido && (
+        <div className="mt-2 flex items-center gap-2 pr-3">
+          {/* El tamaño: tocar el otro lo corrige en el cilindro. */}
+          <div className="flex shrink-0 rounded-[12px] border-[1.5px] border-linea-fuerte p-0.5" role="group" aria-label="Tamaño">
+            {(['chico', 'grande'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => corregir(t)}
+                aria-pressed={item.tamano === t}
+                disabled={corrigiendo}
+                className={`h-10 rounded-[9px] px-3 text-sm font-semibold ${
+                  item.tamano === t ? 'bg-tinta text-white' : 'text-tinta-2'
+                }`}
+              >
+                {t === 'chico' ? 'Chico' : 'Grande'}
+              </button>
+            ))}
+          </div>
+
+          {entrega ? (
+            <select
+              value={gas}
+              onChange={(e) => alCambiarGas(e.target.value)}
+              aria-label={`Gas de ${item.serie}`}
+              className="h-11 min-w-0 flex-1 rounded-[12px] border-[1.5px] border-linea-fuerte bg-white px-2 text-sm font-medium text-tinta"
+            >
+              {gases.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
+          ) : (
+            item.tipoGas !== null && <span className="min-w-0 truncate text-sm text-tinta-2">{item.tipoGas}</span>
+          )}
+        </div>
+      )}
+
+      {error !== null && (
+        <p role="alert" className="mt-1 text-sm text-cargo">
+          {error}
+        </p>
+      )}
+    </li>
   );
 }

@@ -102,7 +102,7 @@ export function PantallaTextoAviso({ alVolver }: { alVolver(): void }) {
           alCambiar={(v) => cambiar('porVencer', v)}
           advertencia={
             textos.porVencer.includes('{importe}')
-              ? 'Este texto lleva {importe}: los empleados no lo van a poder mandar, porque no ven la plata.'
+              ? 'Este texto lleva {importe}: los operarios no lo van a poder mandar, porque no ven la plata.'
               : null
           }
           ejemplo={textoDelAviso(textos, {

@@ -82,6 +82,9 @@ export function FichaCilindro({
           <Dato etiqueta="Ubicación">
             {vista.ubicacion.lugar === 'cliente' ? vista.ubicacion.cliente.nombre : 'En stock'}
           </Dato>
+          {vista.arriendo !== null && vista.arriendo.tipoGas != null && (
+            <Dato etiqueta="Salió con">{vista.arriendo.tipoGas}</Dato>
+          )}
 
           <Dato etiqueta="Estado">
             <ChipEstado estado={estadoVisible(vista.calculo)} />
@@ -105,13 +108,13 @@ export function FichaCilindro({
           <Dato etiqueta="Serie">
             <span className="font-mono">{cilindro.serie}</span>
           </Dato>
-          <Dato etiqueta="Tipo de gas">{cilindro.tipoGas}</Dato>
+          <Dato etiqueta="Último gas">{cilindro.tipoGas}</Dato>
           <Dato etiqueta="Tamaño">{nombreTamano[cilindro.tamano]}</Dato>
           {/*
             La diaria va con decimales a propósito: el SPEC dice que no se
             redondea. Mostrar "$ 13" invitaría a la cuenta equivocada, porque
             32 × 13 da 416 y el importe correcto es 405.
-            Sin tarifa —un empleado— no se muestra ninguna de las dos.
+            Sin tarifa —un operario— no se muestra ninguna de las dos.
           */}
           {cilindro.tarifaMensual !== null && (
             <>
@@ -200,7 +203,8 @@ function Movimiento({
       </div>
 
       <p className="mt-0.5 truncate text-sm text-slate-500">
-        {cliente === null ? 'A stock' : cliente.nombre} · {movimiento.operador}
+        {cliente === null ? 'A stock' : cliente.nombre}
+        {movimiento.tipoGas != null && ` · ${movimiento.tipoGas.toLowerCase()}`} · {movimiento.operador}
       </p>
     </div>
   );

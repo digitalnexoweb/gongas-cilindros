@@ -16,6 +16,7 @@ import type {
   Movimiento,
   Tamano,
   TipoCliente,
+  TipoGas,
   TipoMovimiento,
 } from '../dominio/tipos';
 
@@ -35,6 +36,9 @@ export type FilaCliente = {
   documento: string;
   telefono: string;
   email?: string;
+  direccion?: string;
+  ciudad?: string;
+  notas?: string;
 };
 
 export type FilaCilindro = {
@@ -57,6 +61,7 @@ export type FilaArriendo = {
   cliente_id: string;
   fecha_entrega: string;
   fecha_devolucion: string | null;
+  tipo_gas?: string | null;
 };
 
 export type FilaMovimiento = {
@@ -68,6 +73,7 @@ export type FilaMovimiento = {
   lote_id: string;
   operador: string;
   creado_en: string;
+  tipo_gas?: string | null;
 };
 
 export type FilaAviso = {
@@ -99,6 +105,7 @@ export type Filas = {
   /** Opcionales: los tests de antes de la etapa D no los traen. */
   avisos?: FilaAviso[];
   textosAviso?: FilaTextosAviso | null;
+  tiposGas?: TipoGas[];
 };
 
 /**
@@ -121,6 +128,9 @@ export function armarEstado(filas: Filas, operador: string): EstadoApp {
     documento: c.documento,
     telefono: c.telefono,
     email: c.email ?? '',
+    direccion: c.direccion ?? '',
+    ciudad: c.ciudad ?? '',
+    notas: c.notas ?? '',
   }));
 
   const cilindros: Cilindro[] = filas.cilindros.map((c) => ({
@@ -139,6 +149,7 @@ export function armarEstado(filas: Filas, operador: string): EstadoApp {
     clienteId: a.cliente_id,
     fechaEntrega: fecha(a.fecha_entrega),
     fechaDevolucion: a.fecha_devolucion === null ? null : fecha(a.fecha_devolucion),
+    ...(a.tipo_gas === undefined ? {} : { tipoGas: a.tipo_gas }),
   }));
 
   // Del más viejo al más nuevo, por el momento en que se grabaron. El historial
@@ -156,6 +167,7 @@ export function armarEstado(filas: Filas, operador: string): EstadoApp {
       loteId: m.lote_id,
       operador: m.operador,
       creadoEn: m.creado_en,
+      ...(m.tipo_gas === undefined ? {} : { tipoGas: m.tipo_gas }),
     }));
 
   // Del más viejo al más nuevo, igual que los movimientos.
@@ -186,6 +198,9 @@ export function armarEstado(filas: Filas, operador: string): EstadoApp {
     arriendos,
     movimientos,
     avisos,
+    ...(filas.tiposGas === undefined
+      ? {}
+      : { tiposGas: [...filas.tiposGas].sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre)) }),
     ...(textos == null ? {} : {
           textosAviso: {
             conCargo: textos.con_cargo,

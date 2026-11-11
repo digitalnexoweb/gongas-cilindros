@@ -201,6 +201,36 @@ describe('textoDelAviso, con un texto editado', () => {
   });
 });
 
+describe('el gas', () => {
+  it('el comprobante dice el gas de cada cilindro', () => {
+    const texto = textoComprobante({
+      tipo: 'entrega',
+      series: ['CIL-00101', 'CIL-00102', 'CIL-00103'],
+      cliente: null,
+      fecha: '2026-11-11',
+      gases: ['Oxígeno', 'Argón', null],
+    });
+
+    expect(texto).toContain('- CIL-00101 (oxígeno)');
+    expect(texto).toContain('- CIL-00102 (argón)');
+    // El último, sin gas: va la serie sola, sin paréntesis.
+    expect(texto.endsWith('- CIL-00103')).toBe(true);
+  });
+
+  it('sin gases, el comprobante es el de siempre', () => {
+    expect(
+      textoComprobante({ tipo: 'entrega', series: ['CIL-00101'], cliente: null, fecha: '2026-11-11' }),
+    ).toContain('- CIL-00101');
+  });
+
+  it('el hueco {gas} del aviso se completa, en minúscula', () => {
+    const textos = { conCargo: 'El {serie} con {gas} lleva {dias} días', porVencer: 'x' };
+    expect(
+      textoDelAviso(textos, { cliente: 'A', serie: 'CIL-1', fechaEntrega: '2026-08-05', dias: 92, importe: 1, gas: 'Oxígeno' }),
+    ).toBe('El CIL-1 con oxígeno lleva 92 días');
+  });
+});
+
 describe('textoSinCargo', () => {
   it.each([
     [54, 'le quedan 6 días sin cargo'],

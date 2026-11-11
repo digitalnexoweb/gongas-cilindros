@@ -17,7 +17,7 @@ export function PantallaAvisos() {
   const avisos = useMemo(() => vistaAvisos(estado, hoy), [estado, hoy]);
 
   // La suma de lo que acumula la lista. Si de alguno no se puede ver el importe
-  // (un empleado), no hay total: un total a medias sería un número falso.
+  // (un operario), no hay total: un total a medias sería un número falso.
   const importes = avisos.map((v) => v.calculo?.importe ?? null);
   const total = importes.some((i) => i === null)
     ? null
@@ -75,6 +75,7 @@ export function PantallaAvisos() {
                   serie={vista.cilindro.serie}
                   arriendoId={vista.arriendo.id}
                   fechaEntrega={vista.arriendo.fechaEntrega}
+                  tipoGas={vista.arriendo.tipoGas ?? null}
                   calculo={vista.calculo}
                   ultimo={ultimoAvisoDe(estado.avisos, vista.arriendo.id, 'whatsapp')}
                   mails={(estado.avisos ?? []).filter(
@@ -114,6 +115,7 @@ function FilaAviso({
   serie,
   arriendoId,
   fechaEntrega,
+  tipoGas,
   calculo,
   ultimo,
   mails,
@@ -124,6 +126,7 @@ function FilaAviso({
   serie: string;
   arriendoId: string;
   fechaEntrega: FechaISO;
+  tipoGas: string | null;
   calculo: CalculoVisible;
   /** El último aviso por WhatsApp. */
   ultimo: AvisoRegistrado | null;
@@ -143,6 +146,7 @@ function FilaAviso({
     fechaEntrega,
     dias: calculo.dias,
     importe: calculo.importe,
+    gas: tipoGas,
   });
 
   const estadoMail = textoDelMail({ email: cliente.email ?? '', dias: calculo.dias, mails, hoy });

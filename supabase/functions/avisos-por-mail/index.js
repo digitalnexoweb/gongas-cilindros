@@ -115,7 +115,8 @@ function textoDelAviso(textos, datos) {
 		desde: formatearFecha(datos.fechaEntrega),
 		dias: String(datos.dias),
 		importe: formatearPesos(datos.importe ?? 0),
-		sin_cargo: textoSinCargo(datos.dias)
+		sin_cargo: textoSinCargo(datos.dias),
+		gas: (datos.gas ?? "").toLowerCase()
 	};
 	return plantilla.replace(/\{(\w+)\}/g, (hueco, nombre) => valores[nombre] ?? hueco);
 }
@@ -170,7 +171,8 @@ function mailsPendientes(datos) {
 			serie: a.serie,
 			fechaEntrega: a.fecha_entrega,
 			dias,
-			importe
+			importe,
+			gas: a.tipo_gas ?? null
 		});
 		if (texto === null) continue;
 		mails.push({

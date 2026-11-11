@@ -91,7 +91,7 @@ export function PantallaUsuarios({ alVolver }: { alVolver(): void }) {
             </ul>
             <p className="mt-2 text-sm text-tinta-2">
               Las cuentas nuevas aparecen acá. Activar la deja como estaba: una nueva entra como
-              empleado, que ve todo menos la plata. El rol se cambia tocando el nombre.
+              operario, que ve todo menos la plata. El rol se cambia tocando el nombre.
             </p>
           </section>
         )}
@@ -116,7 +116,7 @@ export function PantallaUsuarios({ alVolver }: { alVolver(): void }) {
                     </span>
                     <span className="shrink-0 text-right text-sm">
                       <span className="block font-semibold">
-                        {u.rol === 'admin' ? 'Administrador' : 'Empleado'}
+                        {u.rol === 'admin' ? 'Administrador' : 'Operario'}
                       </span>
                       <span className={`block ${u.activo ? 'text-gracia' : 'text-cargo'}`}>
                         {u.activo ? 'Activa' : 'Desactivada'}
@@ -212,7 +212,7 @@ function EditarUsuario({
         <Opciones<Rol>
           etiqueta="Rol"
           opciones={[
-            { valor: 'operador', texto: 'Empleado' },
+            { valor: 'operador', texto: 'Operario' },
             { valor: 'admin', texto: 'Administrador' },
           ]}
           valor={rol}

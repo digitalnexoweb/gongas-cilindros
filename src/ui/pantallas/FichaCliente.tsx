@@ -65,6 +65,14 @@ export function FichaCliente({ clienteId, alVolver }: { clienteId: string; alVol
           <Dato etiqueta="Documento">{cliente.documento}</Dato>
           <Dato etiqueta="Teléfono">{cliente.telefono}</Dato>
           <Dato etiqueta="Mail">{cliente.email === undefined || cliente.email === '' ? '—' : cliente.email}</Dato>
+          <Dato etiqueta="Dirección">{(cliente.direccion ?? '') === '' ? '—' : cliente.direccion}</Dato>
+          <Dato etiqueta="Ciudad">{(cliente.ciudad ?? '') === '' ? '—' : cliente.ciudad}</Dato>
+          {(cliente.notas ?? '') !== '' && (
+            <div className="px-4 py-3">
+              <span className="block text-sm text-tinta-2">Notas</span>
+              <p className="mt-1 text-sm whitespace-pre-wrap">{cliente.notas}</p>
+            </div>
+          )}
         </Bloque>
 
         <Bloque titulo={`Cilindros en su poder · ${cilindros.length}`}>

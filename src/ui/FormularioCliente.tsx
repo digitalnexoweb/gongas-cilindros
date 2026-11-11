@@ -26,6 +26,9 @@ export function FormularioCliente({
   const [documento, setDocumento] = useState(inicial?.documento ?? '');
   const [telefono, setTelefono] = useState(inicial?.telefono ?? '+598');
   const [email, setEmail] = useState(inicial?.email ?? '');
+  const [direccion, setDireccion] = useState(inicial?.direccion ?? '');
+  const [ciudad, setCiudad] = useState(inicial?.ciudad ?? '');
+  const [notas, setNotas] = useState(inicial?.notas ?? '');
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +50,9 @@ export function FormularioCliente({
           documento: documento.trim(),
           telefono: telefono.trim(),
           email: email.trim(),
+          direccion: direccion.trim(),
+          ciudad: ciudad.trim(),
+          notas: notas.trim(),
         })
           .catch((falla: unknown) => {
             setError(falla instanceof Error ? falla.message : 'No se pudo guardar el cliente.');
@@ -93,6 +99,18 @@ export function FormularioCliente({
               : 'Eso no parece un mail. Revisalo o dejalo vacío.'
           }
         />
+        <Campo etiqueta="Dirección (opcional)" valor={direccion} alCambiar={setDireccion} />
+        <Campo etiqueta="Ciudad o departamento (opcional)" valor={ciudad} alCambiar={setCiudad} />
+        <label className="block">
+          <span className="block text-sm font-medium text-tinta-2">Notas (opcional)</span>
+          <textarea
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+            rows={3}
+            placeholder="Horarios, indicaciones de entrega…"
+            className="mt-1.5 w-full rounded-[15px] border-[1.5px] border-linea-fuerte bg-white p-3 text-base placeholder:text-tinta-3 focus:border-marca focus:outline-none"
+          />
+        </label>
 
         <ErrorDeFormulario mensaje={error} />
 

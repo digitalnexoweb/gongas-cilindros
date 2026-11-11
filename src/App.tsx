@@ -16,6 +16,9 @@ import { PantallaIngreso } from './ui/pantallas/PantallaIngreso';
 import { PantallaResumen } from './ui/pantallas/PantallaResumen';
 import { PantallaTarifas } from './ui/pantallas/PantallaTarifas';
 import { PantallaTextoAviso } from './ui/pantallas/PantallaTextoAviso';
+import { PantallaTiposGas } from './ui/pantallas/PantallaTiposGas';
+import { PantallaCambiarClave } from './ui/pantallas/PantallaCambiarClave';
+import { PantallaNuevaClave } from './ui/pantallas/PantallaNuevaClave';
 import { PantallaUsuarios } from './ui/pantallas/PantallaUsuarios';
 
 /**
@@ -29,7 +32,9 @@ type Capa =
   | { tipo: 'etiquetas' }
   | { tipo: 'usuarios' }
   | { tipo: 'tarifas' }
-  | { tipo: 'texto-aviso' };
+  | { tipo: 'texto-aviso' }
+  | { tipo: 'tipos-gas' }
+  | { tipo: 'cambiar-clave' };
 
 export function App() {
   return (
@@ -41,7 +46,10 @@ export function App() {
 
 /** Qué se muestra según en qué está la sesión. La app solo aparece con todo listo. */
 function Portones() {
-  const { sesion, reintentar, cerrarSesion } = useSesion();
+  const { sesion, reintentar, cerrarSesion, eligiendoNuevaClave, elegirNuevaClave } = useSesion();
+
+  // Abrieron la app desde el link de "me olvidé la contraseña": antes que nada, la nueva.
+  if (eligiendoNuevaClave) return <PantallaNuevaClave alGuardar={elegirNuevaClave} />;
 
   switch (sesion.fase) {
     case 'cargando':
@@ -166,9 +174,13 @@ function Armazon() {
           alAbrirUsuarios={() => abrir({ tipo: 'usuarios' })}
           alAbrirTarifas={() => abrir({ tipo: 'tarifas' })}
           alAbrirTextoAviso={() => abrir({ tipo: 'texto-aviso' })}
+          alAbrirTiposGas={() => abrir({ tipo: 'tipos-gas' })}
+          alAbrirCambiarClave={() => abrir({ tipo: 'cambiar-clave' })}
         />
       )}
       {capa?.tipo === 'texto-aviso' && <PantallaTextoAviso alVolver={cerrar} />}
+      {capa?.tipo === 'tipos-gas' && <PantallaTiposGas alVolver={cerrar} />}
+      {capa?.tipo === 'cambiar-clave' && <PantallaCambiarClave alVolver={cerrar} />}
       {capa?.tipo === 'etiquetas' && <PantallaEtiquetas alVolver={cerrar} />}
       {capa?.tipo === 'usuarios' && <PantallaUsuarios alVolver={cerrar} />}
       {capa?.tipo === 'tarifas' && <PantallaTarifas alVolver={cerrar} />}

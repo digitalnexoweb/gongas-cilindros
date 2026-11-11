@@ -44,6 +44,11 @@ export type Cliente = {
   telefono: string;
   /** Para los avisos automáticos. Vacío o ausente: no se le avisa por mail. */
   email?: string;
+  direccion?: string;
+  /** Ciudad o departamento. */
+  ciudad?: string;
+  /** Texto libre: horarios, indicaciones de entrega. */
+  notas?: string;
 };
 
 /** Se abre con cada entrega y se cierra con la devolución. */
@@ -53,6 +58,8 @@ export type Arriendo = {
   clienteId: string;
   fechaEntrega: FechaISO;
   fechaDevolucion: FechaISO | null;
+  /** El gas con el que salió. Solo viene de la base; la demo no lo tiene. */
+  tipoGas?: string | null;
 };
 
 export type TipoMovimiento = 'entrega' | 'devolucion';
@@ -73,6 +80,8 @@ export type Movimiento = {
    * Falta en los movimientos que no vienen de la base, como los de la demo.
    */
   creadoEn?: string;
+  /** En una entrega, el gas con el que salió; en una devolución, con el que había salido. */
+  tipoGas?: string | null;
 };
 
 /**
@@ -123,4 +132,13 @@ export type EstadoApp = {
   avisos?: AvisoRegistrado[];
   /** Solo vienen de la base. Sin esto, se usan los textos originales. */
   textosAviso?: TextosAviso;
+  /** Los gases que se pueden elegir al entregar. Solo vienen de la base. */
+  tiposGas?: TipoGas[];
+};
+
+export type TipoGas = {
+  nombre: string;
+  /** Uno que ya se usó no se borra: se deja de ofrecer. */
+  activo: boolean;
+  orden: number;
 };

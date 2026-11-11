@@ -9,7 +9,7 @@
 
 import type { FechaISO } from '../dominio/arriendo';
 import { armarAviso, type AvisoLote, type TipoAviso } from '../dominio/storage';
-import type { Cliente, EstadoApp, Tamano, TextosAviso, TipoMovimiento } from '../dominio/tipos';
+import type { Cliente, EstadoApp, Tamano, TextosAviso, TipoGas, TipoMovimiento } from '../dominio/tipos';
 import {
   armarEstado,
   type FilaArriendo,
@@ -141,19 +141,19 @@ async function traerTodo<T>(tabla: string, columnas: string, orden: string[]): P
 
 /** La foto completa del estado, tal como la base se la entrega a este usuario. */
 export async function cargarEstado(perfil: Perfil): Promise<EstadoApp> {
-  const [clientes, cilindros, tarifas, arriendos, movimientos, avisos, textos] = await Promise.all([
-    traerTodo<FilaCliente>('clientes', 'id, nombre, tipo, documento, telefono, email', ['nombre', 'id']),
+  const [clientes, cilindros, tarifas, arriendos, movimientos, avisos, textos, tiposGas] = await Promise.all([
+    traerTodo<FilaCliente>('clientes', 'id, nombre, tipo, documento, telefono, email, direccion, ciudad, notas', ['nombre', 'id']),
     traerTodo<FilaCilindro>('cilindros', 'id, serie, tipo_gas, tamano, activo', ['serie']),
     // A un empleado esto le vuelve vacío: la base no le entrega tarifas.
     traerTodo<FilaTarifa>('tarifas', 'cilindro_id, tarifa_mensual', ['cilindro_id']),
     traerTodo<FilaArriendo>(
       'arriendos',
-      'id, cilindro_id, cliente_id, fecha_entrega, fecha_devolucion',
+      'id, cilindro_id, cliente_id, fecha_entrega, fecha_devolucion, tipo_gas',
       ['fecha_entrega', 'id'],
     ),
     traerTodo<FilaMovimiento>(
       'movimientos',
-      'id, tipo, cilindro_id, cliente_id, fecha, lote_id, operador, creado_en',
+      'id, tipo, cilindro_id, cliente_id, fecha, lote_id, operador, creado_en, tipo_gas',
       ['creado_en', 'id'],
     ),
     traerTodo<FilaAviso>(
@@ -162,6 +162,7 @@ export async function cargarEstado(perfil: Perfil): Promise<EstadoApp> {
       ['creado_en', 'id'],
     ),
     supabase.from('textos_aviso').select('con_cargo, por_vencer, copia_mail').maybeSingle(),
+    traerTodo<TipoGas>('tipos_gas', 'nombre, activo, orden', ['orden', 'nombre']),
   ]);
 
   if (textos.error !== null) throw falla(textos.error);
@@ -175,6 +176,7 @@ export async function cargarEstado(perfil: Perfil): Promise<EstadoApp> {
       movimientos,
       avisos,
       textosAviso: textos.data as FilaTextosAviso | null,
+      tiposGas,
     },
     perfil.nombre,
   );
@@ -195,6 +197,8 @@ export type LoteConfirmado = {
   hora: string;
   /** Las series que de verdad se grabaron, no las que se escanearon. */
   series: string[];
+  /** El gas de cada serie grabada, en el mismo orden. */
+  gases: (string | null)[];
   avisos: AvisoLote[];
 };
 
@@ -203,7 +207,7 @@ type RespuestaDeLote = {
   numero: number | null;
   fecha: string;
   hora: string;
-  movimientos: { serie: string }[];
+  movimientos: { serie: string; tipo_gas?: string | null }[];
   avisos: { serie: string; tipo: TipoAviso }[];
 };
 
@@ -215,11 +219,14 @@ export async function confirmarLote(
   tipo: TipoMovimiento,
   series: string[],
   clienteId: string | null,
+  /** El gas de cada serie, en el mismo orden. Solo en las entregas. */
+  gases?: (string | null)[],
 ): Promise<LoteConfirmado> {
   const { data, error } = await supabase.rpc('confirmar_lote', {
     p_tipo: tipo,
     p_series: series,
     p_cliente_id: clienteId,
+    ...(gases === undefined ? {} : { p_gases: gases }),
   });
 
   if (error !== null) throw falla(error);
@@ -231,6 +238,7 @@ export async function confirmarLote(
     fecha: lote.fecha,
     hora: lote.hora,
     series: lote.movimientos.map((m) => m.serie),
+    gases: lote.movimientos.map((m) => m.tipo_gas ?? null),
     avisos: lote.avisos.map((a) => armarAviso(a.serie, a.tipo)),
   };
 }
@@ -245,6 +253,9 @@ export async function altaCliente(datos: Omit<Cliente, 'id'>): Promise<string> {
       documento: datos.documento,
       telefono: datos.telefono,
       email: datos.email ?? '',
+      direccion: datos.direccion ?? '',
+      ciudad: datos.ciudad ?? '',
+      notas: datos.notas ?? '',
     })
     .select('id')
     .single();
@@ -254,8 +265,21 @@ export async function altaCliente(datos: Omit<Cliente, 'id'>): Promise<string> {
 }
 
 /** Da de alta un cilindro. La tarifa la pone la base según el tamaño. */
-export async function altaCilindro(serie: string, tamano: Tamano): Promise<void> {
-  const { error } = await supabase.rpc('alta_cilindro', { p_serie: serie, p_tamano: tamano });
+export async function altaCilindro(serie: string, tamano: Tamano, tipoGas?: string): Promise<void> {
+  const { error } = await supabase.rpc('alta_cilindro', {
+    p_serie: serie,
+    p_tamano: tamano,
+    ...(tipoGas === undefined ? {} : { p_tipo_gas: tipoGas }),
+  });
+  if (error !== null) throw falla(error);
+}
+
+/**
+ * Corrige el tamaño de un cilindro. Cualquier usuario activo: es un dato
+ * físico. La tarifa pasa a la del tamaño nuevo salvo que tuviera un precio propio.
+ */
+export async function corregirTamano(serie: string, tamano: Tamano): Promise<void> {
+  const { error } = await supabase.rpc('corregir_tamano', { p_serie: serie, p_tamano: tamano });
   if (error !== null) throw falla(error);
 }
 
@@ -308,6 +332,9 @@ export async function editarCliente(id: string, datos: Omit<Cliente, 'id'>): Pro
       documento: datos.documento,
       telefono: datos.telefono,
       email: datos.email ?? '',
+      direccion: datos.direccion ?? '',
+      ciudad: datos.ciudad ?? '',
+      notas: datos.notas ?? '',
     })
     .eq('id', id)
     .select('id');
@@ -388,6 +415,73 @@ export async function guardarTextosAviso(textos: TextosAviso): Promise<void> {
 
   if (error !== null) throw falla(error);
   if ((data ?? []).length === 0) throw new Error('No tenés permiso para hacer eso.');
+}
+
+// ───────────────────────────────────────────────────────── Tipos de gas
+
+/** Solo el administrador. */
+export async function agregarTipoGas(nombre: string, orden: number): Promise<void> {
+  const { error } = await supabase.from('tipos_gas').insert({ nombre, orden });
+  if (error === null) return;
+  if (/duplicate|unique/i.test(error.message)) throw new Error('Ese gas ya está en la lista.');
+  throw falla(error);
+}
+
+/** Ofrecerlo o no al entregar. Uno que ya se usó no se borra. Solo el administrador. */
+export async function cambiarTipoGas(nombre: string, activo: boolean): Promise<void> {
+  const { data, error } = await supabase.from('tipos_gas').update({ activo }).eq('nombre', nombre).select('nombre');
+  if (error !== null) throw falla(error);
+  if ((data ?? []).length === 0) throw new Error('No tenés permiso para hacer eso.');
+}
+
+// ───────────────────────────────────────────────────────── Contraseñas
+
+/**
+ * Manda el mail con el link para elegir una contraseña nueva. Por seguridad no
+ * dice si el mail existe o no: siempre responde igual.
+ */
+export async function pedirNuevaClave(mail: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(mail, {
+    redirectTo: window.location.origin,
+  });
+  if (error === null) return;
+  if (/fetch|network/i.test(error.message)) throw new Error('No hay conexión. Probá de nuevo.');
+  if (/rate|too many|seconds/i.test(error.message)) {
+    throw new Error('Ya pediste uno hace poco. Esperá un minuto y probá de nuevo.');
+  }
+  throw new Error('No se pudo mandar el mail. Probá de nuevo en un rato.');
+}
+
+/** Al volver del link del mail: la sesión ya es la de ese usuario, falta la clave nueva. */
+export async function elegirNuevaClave(nueva: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password: nueva });
+  if (error === null) return;
+  if (/same|different/i.test(error.message)) throw new Error('Tiene que ser distinta de la anterior.');
+  if (/password/i.test(error.message)) throw new Error('Esa contraseña no sirve: probá con una más larga.');
+  throw new Error('No se pudo cambiar la contraseña. Probá de nuevo.');
+}
+
+/**
+ * Cambiar la contraseña desde Ajustes. Pide la actual y la comprueba entrando
+ * de nuevo con ella: así nadie que agarre un celular desbloqueado la cambia.
+ */
+export async function cambiarClave(actual: string, nueva: string): Promise<void> {
+  const { data } = await supabase.auth.getUser();
+  const mail = data.user?.email;
+  if (mail === undefined) throw new Error('No hay sesión abierta.');
+
+  const comprobacion = await supabase.auth.signInWithPassword({ email: mail, password: actual });
+  if (comprobacion.error !== null) throw new Error('La contraseña actual no es correcta.');
+
+  await elegirNuevaClave(nueva);
+}
+
+/** Avisa cuando se abre la app desde el link de "me olvidé la contraseña". */
+export function alVolverDelLinkDeClave(aviso: () => void): () => void {
+  const { data } = supabase.auth.onAuthStateChange((evento) => {
+    if (evento === 'PASSWORD_RECOVERY') aviso();
+  });
+  return () => data.subscription.unsubscribe();
 }
 
 // ───────────────────────────────────────────────────────── Enterarse

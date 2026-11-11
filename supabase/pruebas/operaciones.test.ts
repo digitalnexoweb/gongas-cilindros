@@ -255,7 +255,7 @@ describe('lo que no depende del celular', () => {
        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
        where n.nspname = 'public' and p.proname = 'confirmar_lote'`,
     );
-    expect(firma?.argumentos).toBe('p_tipo text, p_series text[], p_cliente_id uuid');
+    expect(firma?.argumentos).toBe('p_tipo text, p_series text[], p_cliente_id uuid, p_gases text[]');
   });
 });
 

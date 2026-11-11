@@ -18,7 +18,7 @@ const claseBotonPrincipal =
  * "tu cuenta no está activa" hasta que el administrador la activa.
  */
 export function PantallaIngreso() {
-  const [modo, setModo] = useState<'entrar' | 'crear'>('entrar');
+  const [modo, setModo] = useState<'entrar' | 'crear' | 'olvido'>('entrar');
 
   return (
     // Fondo blanco porque el logo viene con fondo blanco: sobre el gris se vería el recuadro.
@@ -28,20 +28,22 @@ export function PantallaIngreso() {
           <img src="/logo-gongas.png" alt="GONGAS" className="h-11 w-auto" />
         </h1>
         <p className="mt-3 font-titulo text-xl font-bold tracking-tight">
-          {modo === 'entrar' ? 'Control de cilindros' : 'Crear cuenta'}
+          {modo === 'entrar' ? 'Control de cilindros' : modo === 'crear' ? 'Crear cuenta' : 'Recuperar la contraseña'}
         </p>
       </div>
 
       {modo === 'entrar' ? (
-        <FormularioEntrar alCrearCuenta={() => setModo('crear')} />
-      ) : (
+        <FormularioEntrar alCrearCuenta={() => setModo('crear')} alOlvidar={() => setModo('olvido')} />
+      ) : modo === 'crear' ? (
         <FormularioCrear alVolver={() => setModo('entrar')} />
+      ) : (
+        <FormularioOlvido alVolver={() => setModo('entrar')} />
       )}
     </div>
   );
 }
 
-function FormularioEntrar({ alCrearCuenta }: { alCrearCuenta(): void }) {
+function FormularioEntrar({ alCrearCuenta, alOlvidar }: { alCrearCuenta(): void; alOlvidar(): void }) {
   const { ingresar } = useSesion();
 
   const [mail, setMail] = useState('');
@@ -105,6 +107,88 @@ function FormularioEntrar({ alCrearCuenta }: { alCrearCuenta(): void }) {
           className="h-12 w-full rounded-[15px] text-base font-semibold text-marca active:bg-fondo"
         >
           ¿Sos nuevo? Crear cuenta
+        </button>
+        <button
+          type="button"
+          onClick={alOlvidar}
+          className="h-11 w-full rounded-[15px] text-sm font-semibold text-tinta-2 active:bg-fondo"
+        >
+          ¿Te olvidaste la contraseña?
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** Pide el mail y manda el link para elegir una contraseña nueva. */
+function FormularioOlvido({ alVolver }: { alVolver(): void }) {
+  const { pedirNuevaClave } = useSesion();
+
+  const [mail, setMail] = useState('');
+  const [mandando, setMandando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [mandado, setMandado] = useState(false);
+
+  const mailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail.trim());
+
+  if (mandado) {
+    return (
+      <div className="space-y-6">
+        <p className="text-base text-tinta-2">
+          Si <strong className="text-tinta">{mail.trim()}</strong> tiene una cuenta, te llegó un mail con
+          un link. Abrilo desde este mismo celular y la app te va a pedir la contraseña nueva. Si no lo
+          ves, fijate en spam.
+        </p>
+        <button type="button" onClick={alVolver} className={claseBotonPrincipal}>
+          Volver a entrar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!mailValido || mandando) return;
+
+        setMandando(true);
+        setError(null);
+        pedirNuevaClave(mail.trim())
+          .then(() => setMandado(true))
+          .catch((falla: unknown) => {
+            setError(falla instanceof Error ? falla.message : 'No se pudo mandar el mail.');
+          })
+          .finally(() => setMandando(false));
+      }}
+      className="space-y-6"
+    >
+      <p className="text-sm text-tinta-2">Te mandamos un link para elegir una contraseña nueva.</p>
+
+      <Campo etiqueta="Tu mail">
+        <input
+          type="email"
+          inputMode="email"
+          autoComplete="username"
+          autoCapitalize="none"
+          value={mail}
+          onChange={(e) => setMail(e.target.value)}
+          className={claseCampo}
+        />
+      </Campo>
+
+      <MensajeDeError mensaje={error} />
+
+      <div className="space-y-2">
+        <button type="submit" disabled={!mailValido || mandando} className={claseBotonPrincipal}>
+          {mandando ? 'Mandando…' : 'Mandame el link'}
+        </button>
+        <button
+          type="button"
+          onClick={alVolver}
+          className="h-12 w-full rounded-[15px] text-base font-semibold text-marca active:bg-fondo"
+        >
+          Volver
         </button>
       </div>
     </form>

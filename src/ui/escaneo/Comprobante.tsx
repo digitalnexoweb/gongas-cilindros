@@ -37,9 +37,12 @@ export function Comprobante({
   const [copiado, setCopiado] = useState(false);
 
   // El texto de WhatsApp es el de siempre: el remito no entra en el mensaje.
-  const texto = textoComprobante({ tipo, series: lote.series, cliente, fecha: lote.fecha });
+  const texto = textoComprobante({ tipo, series: lote.series, cliente, fecha: lote.fecha, gases: lote.gases });
   const whatsapp =
-    cliente !== null && cliente.telefono.trim() !== '' ? linkWhatsApp(cliente.telefono, texto) : null;
+    // Con un número completo: "+598" solo, que es lo que trae el formulario, no alcanza.
+    cliente !== null && cliente.telefono.replace(/\D/g, '').length >= 8
+      ? linkWhatsApp(cliente.telefono, texto)
+      : null;
 
   const n = lote.series.length;
   const cilindros = n === 1 ? '1 cilindro' : `${n} cilindros`;
@@ -107,7 +110,7 @@ export function Comprobante({
                   <span className="font-mono text-[17px] font-bold">{serie}</span>
                   {cilindro !== null && (
                     <span className="text-sm text-tinta-2">
-                      {cilindro.tamano === 'grande' ? 'Grande' : 'Chico'} · {cilindro.tipoGas}
+                      {cilindro.tamano === 'grande' ? 'Grande' : 'Chico'} · {(lote.gases[i] ?? cilindro.tipoGas).toLowerCase()}
                     </span>
                   )}
                 </li>
