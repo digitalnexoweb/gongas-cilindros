@@ -16,7 +16,7 @@ export function Encabezado({
   children?: ReactNode;
 }) {
   return (
-    <header className="no-imprimir sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 backdrop-blur">
+    <header className="no-imprimir sticky top-0 z-10 border-b border-linea bg-white/95 backdrop-blur">
       <div className="flex items-center gap-1 px-4 pt-4 pb-3">
         {alVolver !== undefined && (
           <button
@@ -41,7 +41,9 @@ export function Encabezado({
         )}
 
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-bold tracking-tight">{titulo}</h1>
+          <h1 className="truncate font-titulo text-[29px] leading-tight font-bold tracking-tight">
+            {titulo}
+          </h1>
           {bajada !== undefined && <p className="mt-0.5 text-sm text-slate-500">{bajada}</p>}
         </div>
 

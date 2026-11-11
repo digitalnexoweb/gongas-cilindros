@@ -53,6 +53,22 @@ export function PantallaResumen() {
         </select>
       </Encabezado>
 
+      {/* DISENO.md: "la plata va arriba". El total abre la pantalla, aunque sea $ 0. */}
+      {resumen !== null && (
+        <section className="mx-4 mt-4 rounded-2xl bg-marca px-5 py-5 text-white">
+          <p className="text-xs font-semibold tracking-wider text-marca-clara uppercase">
+            Total de {nombreDelMes(mes)}
+          </p>
+          <p className="mt-1 font-titulo text-[42px] leading-none font-bold tabular-nums">
+            {formatearPesos(resumen.total)}
+          </p>
+          <p className="mt-3 text-sm text-marca-clara">
+            {resumen.filas.length === 1 ? '1 cliente' : `${resumen.filas.length} clientes`} ·{' '}
+            {resumen.filas.reduce((s, f) => s + f.diasFacturables, 0)} días facturables
+          </p>
+        </section>
+      )}
+
       {resumen === null ? (
         <p className="px-8 pt-16 text-center text-sm text-slate-500">
           A algún cilindro con cargo en {nombreDelMes(mes)} le falta la tarifa, así que el total
@@ -64,7 +80,7 @@ export function PantallaResumen() {
         </p>
       ) : (
         <>
-          <ul className="divide-y divide-slate-200 border-b border-slate-200 bg-white">
+          <ul className="mt-4 divide-y divide-slate-200 border-y border-slate-200 bg-white">
             {resumen.filas.map((fila) => (
               <li key={fila.cliente.id} className="px-4 py-3.5">
                 <div className="flex items-baseline justify-between gap-3">

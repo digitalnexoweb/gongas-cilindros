@@ -67,18 +67,22 @@ const items: { id: Pestana; etiqueta: string; icono: ReactNode }[] = [
 export function NavegacionInferior({
   activa,
   alElegir,
+  enCargo,
 }: {
   activa: Pestana;
   alElegir(pestana: Pestana): void;
+  /** Cuántos cilindros ya generan cargo: el globo rojo de Avisos. Es una cantidad, no plata. */
+  enCargo: number;
 }) {
   return (
     <nav
       aria-label="Navegación principal"
-      className="no-imprimir fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
+      className="no-imprimir fixed inset-x-0 bottom-0 z-20 border-t border-linea bg-white pb-[env(safe-area-inset-bottom)]"
     >
       <ul className="grid grid-cols-5">
         {items.map((item) => {
           const esActiva = item.id === activa;
+          const globo = item.id === 'avisos' && enCargo > 0 ? enCargo : null;
 
           return (
             <li key={item.id}>
@@ -86,14 +90,25 @@ export function NavegacionInferior({
                 type="button"
                 onClick={() => alElegir(item.id)}
                 aria-current={esActiva ? 'page' : undefined}
-                className={`flex h-16 w-full flex-col items-center justify-center gap-1 active:bg-slate-100 ${
-                  esActiva ? 'text-slate-900' : 'text-slate-400'
+                aria-label={globo === null ? undefined : `${item.etiqueta}, ${globo} para cobrar`}
+                className={`flex h-[62px] w-full flex-col items-center justify-center gap-1 active:bg-fondo ${
+                  esActiva ? 'text-marca' : 'text-tinta-3'
                 }`}
               >
-                <svg className="size-6" viewBox="0 0 24 24" aria-hidden="true" {...trazo}>
-                  {item.icono}
-                </svg>
-                <span className={`text-[11px] ${esActiva ? 'font-semibold' : ''}`}>
+                <span className="relative">
+                  <svg className="size-6" viewBox="0 0 24 24" aria-hidden="true" {...trazo}>
+                    {item.icono}
+                  </svg>
+                  {globo !== null && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -top-1.5 left-3.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-cargo px-1 text-[11px] leading-none font-bold text-white ring-2 ring-white"
+                    >
+                      {globo > 99 ? '99+' : globo}
+                    </span>
+                  )}
+                </span>
+                <span className={`text-[11px] ${esActiva ? 'font-bold' : 'font-medium'}`}>
                   {item.etiqueta}
                 </span>
               </button>

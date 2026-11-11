@@ -19,7 +19,7 @@ export function Visor({
   const andando = estado === 'escaneando';
 
   return (
-    <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-900">
+    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-tinta">
       <video
         ref={videoRef}
         playsInline
@@ -30,9 +30,16 @@ export function Visor({
       {andando && (
         <>
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="size-44 rounded-2xl border-4 border-white/85" />
+            {/* El marco de cuatro esquinas, con la línea verde que dice "estoy leyendo". */}
+            <div className="relative size-44">
+              <span className="absolute top-0 left-0 size-9 rounded-tl-2xl border-t-4 border-l-4 border-white" />
+              <span className="absolute top-0 right-0 size-9 rounded-tr-2xl border-t-4 border-r-4 border-white" />
+              <span className="absolute bottom-0 left-0 size-9 rounded-bl-2xl border-b-4 border-l-4 border-white" />
+              <span className="absolute right-0 bottom-0 size-9 rounded-br-2xl border-r-4 border-b-4 border-white" />
+              <span className="absolute inset-x-3 top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-[#3DDC97] shadow-[0_0_10px_#3DDC97]" />
+            </div>
           </div>
-          <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-sm text-white/90">
+          <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-sm font-medium text-white">
             Apuntá al QR del cilindro
           </p>
         </>
@@ -51,7 +58,7 @@ export function Visor({
             <button
               type="button"
               onClick={reintentar}
-              className="h-11 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900"
+              className="h-11 rounded-xl bg-white px-4 text-sm font-semibold text-tinta"
             >
               Reintentar
             </button>

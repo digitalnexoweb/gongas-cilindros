@@ -1,27 +1,58 @@
 @import 'tailwindcss';
 
 /*
- * Los tres estados del arriendo de la sección 5 del SPEC, en un solo lugar.
- * Texto oscuro sobre fondo claro, para que se lea en un celular al sol.
+ * Los tokens de DISENO.md, sección 2. Todos los pares de texto sobre fondo
+ * pasan 4.5:1: no aclarar ninguno.
+ *
+ * Las tres familias de letra vienen de Google Fonts (el link está en
+ * index.html). Sin conexión caen en la letra del sistema.
  */
 @theme {
-  --color-gracia: #475569;
-  --color-gracia-suave: #f1f5f9;
-  --color-gracia-borde: #cbd5e1;
+  /* Marca */
+  --color-marca: #1C2D5F;
+  --color-marca-tinta: #142145;
+  --color-marca-suave: #E9ECF5;
+  --color-marca-clara: #A9B4D0;
+  --color-rojo-marca: #CE2027;
 
-  --color-vencer: #92400e;
-  --color-vencer-suave: #fef3c7;
-  --color-vencer-borde: #fcd34d;
+  /* Texto y superficies */
+  --color-tinta: #0C1116;
+  --color-tinta-2: #56636D;
+  --color-tinta-3: #5E6A74;
+  --color-fondo: #F3F5F7;
+  --color-linea: #E2E7EB;
+  --color-linea-fuerte: #CDD5DC;
 
-  --color-cargo: #991b1b;
-  --color-cargo-suave: #fee2e2;
-  --color-cargo-borde: #fca5a5;
+  /* Los cuatro estados del cilindro */
+  --color-stock: #46525B;
+  --color-stock-suave: #EEF1F3;
+  --color-stock-borde: #CDD5DC;
+
+  --color-gracia: #0B5A4D;
+  --color-gracia-suave: #E4F2EE;
+  --color-gracia-borde: #0D6E5E;
+
+  --color-vencer: #8A5200;
+  --color-vencer-suave: #FBEED7;
+  --color-vencer-borde: #D79A28;
+
+  --color-cargo: #A81D24;
+  --color-cargo-suave: #FBE9EA;
+  --color-cargo-borde: #A81D24;
+
+  /* Tipografía */
+  --font-titulo: 'Space Grotesk', system-ui, sans-serif;
+  --font-cuerpo: 'Inter', system-ui, sans-serif;
+  --font-serie: 'JetBrains Mono', ui-monospace, monospace;
+  /* Todas las series usan `font-mono`: así pasan a JetBrains Mono sin tocar las pantallas. */
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
 body {
   margin: 0;
-  background-color: #f8fafc;
-  color: #0f172a;
+  font-family: var(--font-cuerpo);
+  background-color: var(--color-fondo);
+  color: var(--color-tinta);
   -webkit-font-smoothing: antialiased;
   /* Que el rebote del scroll no arrastre la página entera en Android. */
   overscroll-behavior-y: contain;

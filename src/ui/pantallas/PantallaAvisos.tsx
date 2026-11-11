@@ -1,11 +1,10 @@
 import { useMemo } from 'react';
 
-import { DIAS_GRACIA, formatearFecha } from '../../dominio/arriendo';
+import { DIAS_GRACIA, formatearFecha, formatearPesos } from '../../dominio/arriendo';
 import { vistaAvisos } from '../../dominio/consultas';
 import { linkWhatsApp, textoAviso } from '../../dominio/mensajes';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { ChipEstado, estadoVisible } from '../ChipEstado';
-import { Encabezado } from '../Encabezado';
 import { Importe } from '../Importe';
 
 /** La sección 6.4, que el SPEC llama el corazón del sistema. */
@@ -13,18 +12,45 @@ export function PantallaAvisos() {
   const { estado, hoy } = useEstado();
   const avisos = useMemo(() => vistaAvisos(estado, hoy), [estado, hoy]);
 
+  // La suma de lo que acumula la lista. Si de alguno no se puede ver el importe
+  // (un empleado), no hay total: un total a medias sería un número falso.
+  const importes = avisos.map((v) => v.calculo?.importe ?? null);
+  const total = importes.some((i) => i === null)
+    ? null
+    : importes.reduce<number>((suma, i) => suma + (i ?? 0), 0);
+
+  const cuantos =
+    avisos.length === 0
+      ? 'Ningún cilindro con 54 días o más'
+      : avisos.length === 1
+        ? '1 cilindro con 54 días o más'
+        : `${avisos.length} cilindros con 54 días o más`;
+
   return (
     <>
-      <Encabezado
-        titulo="Avisos"
-        bajada={
-          avisos.length === 0
-            ? 'Nada por vencer'
-            : avisos.length === 1
-              ? '1 cilindro con 54 días o más'
-              : `${avisos.length} cilindros con 54 días o más`
-        }
-      />
+      {/*
+        DISENO.md: "la plata va arriba". Joaquín no entra a esta pantalla a
+        leer una lista, entra a ver cuánto hay para cobrar. No queda fijo al
+        hacer scroll: con un número de 46 px se comería media pantalla.
+      */}
+      <header className="no-imprimir bg-tinta px-4 pt-5 pb-6 text-white">
+        <h1 className="font-titulo text-[29px] leading-tight font-bold tracking-tight">Avisos</h1>
+
+        {total !== null && avisos.length > 0 && (
+          <>
+            <p className="mt-4 text-xs font-semibold tracking-wider text-marca-clara uppercase">
+              Para cobrar
+            </p>
+            <p className="font-titulo text-[46px] leading-none font-bold tabular-nums">
+              {formatearPesos(total)}
+            </p>
+          </>
+        )}
+
+        <p className="mt-3 text-sm text-marca-clara">
+          {avisos.length === 0 ? 'Nada para cobrar' : cuantos}
+        </p>
+      </header>
 
       {avisos.length === 0 ? (
         <p className="px-8 pt-16 text-center text-sm text-slate-500">

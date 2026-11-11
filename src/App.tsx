@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { ProveedorEstado, useSesion } from './estado/ProveedorEstado';
+import { ProveedorEstado, useEstado, useSesion } from './estado/ProveedorEstado';
+import { paraCobrar } from './ui/paraCobrar';
 import { CuentaDesactivada } from './ui/CuentaDesactivada';
 import { NavegacionInferior, type Pestana } from './ui/NavegacionInferior';
 import { FichaCilindro } from './ui/pantallas/FichaCilindro';
@@ -83,9 +84,14 @@ function Portones() {
 }
 
 function Armazon() {
+  const { estado, hoy } = useEstado();
+  const enCargo = useMemo(() => paraCobrar(estado, hoy).cantidad, [estado, hoy]);
+
   // Escanear es la pantalla de inicio, como dice la sección 6.1.
   const [pestana, setPestana] = useState<Pestana>('escanear');
   const [capas, setCapas] = useState<Capa[]>([]);
+  // Mientras se escanea un lote, y en su comprobante, no hay barra de navegación.
+  const [enFlujo, setEnFlujo] = useState(false);
 
   // El botón atrás de Android saca una capa en vez de salir de la app.
   useEffect(() => {
@@ -121,13 +127,18 @@ function Armazon() {
   }, []);
 
   const capa = capas.at(-1) ?? null;
+  const conNavegacion = !(enFlujo && capa === null && pestana === 'escanear');
 
   return (
-    <div className="min-h-dvh pb-20">
+    <div className={`min-h-dvh ${conNavegacion ? 'pb-20' : ''}`}>
       {capa === null && (
         <>
           {pestana === 'escanear' && (
-            <PantallaEscaneo alAbrirAjustes={() => abrir({ tipo: 'ajustes' })} />
+            <PantallaEscaneo
+              alAbrirAjustes={() => abrir({ tipo: 'ajustes' })}
+              alIrAAvisos={() => irA('avisos')}
+              alCambiarFlujo={setEnFlujo}
+            />
           )}
           {pestana === 'cilindros' && (
             <PantallaCilindros alAbrir={(id) => abrir({ tipo: 'cilindro', id })} />
@@ -150,7 +161,7 @@ function Armazon() {
       )}
       {capa?.tipo === 'etiquetas' && <PantallaEtiquetas alVolver={cerrar} />}
 
-      <NavegacionInferior activa={pestana} alElegir={irA} />
+      {conNavegacion && <NavegacionInferior activa={pestana} alElegir={irA} enCargo={enCargo} />}
     </div>
   );
 }

@@ -65,6 +65,12 @@ export type Movimiento = {
   loteId: string;
   /** Nombre elegido al abrir la app. */
   operador: string;
+  /**
+   * El momento exacto en que se grabó, como lo guarda la base (ISO, en UTC).
+   * Solo para mostrar la hora: ningún cálculo lo usa, el reloj cuenta por `fecha`.
+   * Falta en los movimientos que no vienen de la base, como los de la demo.
+   */
+  creadoEn?: string;
 };
 
 /** Todo lo que se guarda, en una sola pieza. */

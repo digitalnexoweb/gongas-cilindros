@@ -133,8 +133,15 @@ export async function cargarEstado(perfil: Perfil): Promise<EstadoApp> {
 
 export type LoteConfirmado = {
   loteId: string;
+  /**
+   * El número de remito, correlativo: LOTE-0001, LOTE-0002… `null` si no se
+   * grabó ningún movimiento, porque un lote vacío no gasta número.
+   */
+  numero: number | null;
   /** La fecha que puso el servidor, en hora de Montevideo. */
   fecha: FechaISO;
+  /** La hora que puso el servidor, en hora de Montevideo: 'HH:MM'. */
+  hora: string;
   /** Las series que de verdad se grabaron, no las que se escanearon. */
   series: string[];
   avisos: AvisoLote[];
@@ -142,7 +149,9 @@ export type LoteConfirmado = {
 
 type RespuestaDeLote = {
   lote_id: string;
+  numero: number | null;
   fecha: string;
+  hora: string;
   movimientos: { serie: string }[];
   avisos: { serie: string; tipo: TipoAviso }[];
 };
@@ -167,7 +176,9 @@ export async function confirmarLote(
   const lote = data as RespuestaDeLote;
   return {
     loteId: lote.lote_id,
+    numero: lote.numero,
     fecha: lote.fecha,
+    hora: lote.hora,
     series: lote.movimientos.map((m) => m.serie),
     avisos: lote.avisos.map((a) => armarAviso(a.serie, a.tipo)),
   };

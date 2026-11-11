@@ -1,27 +1,54 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import type { LoteConfirmado } from '../../datos/repositorio';
-import { formatearFecha } from '../../dominio/arriendo';
+import { DIAS_GRACIA, formatearFecha } from '../../dominio/arriendo';
+import { cilindroPorSerie } from '../../dominio/consultas';
 import { linkWhatsApp, textoComprobante } from '../../dominio/mensajes';
 import type { Cliente, TipoMovimiento } from '../../dominio/tipos';
-import { Encabezado } from '../Encabezado';
+import { useEstado } from '../../estado/ProveedorEstado';
+import { Alerta, Reloj, Tilde, WhatsApp } from '../iconos';
 
-/** El comprobante de 6.1: las series, el cliente y la fecha, para copiar o mandar. */
+/** El número de remito como se lo dicta Joaquín a un cliente: LOTE-0001. */
+function formatearRemito(numero: number): string {
+  return `LOTE-${String(numero).padStart(4, '0')}`;
+}
+
+/**
+ * El comprobante de 6.1: qué se grabó, cuándo, quién y con qué remito, para
+ * mandar por WhatsApp o copiar.
+ */
 export function Comprobante({
   lote,
   tipo,
   cliente,
+  destino,
   alTerminar,
 }: {
-  /** Lo que la base confirmó que grabó: sus series y su fecha, no las del celular. */
+  /** Lo que la base confirmó que grabó: sus series, su fecha y su hora, no las del celular. */
   lote: LoteConfirmado;
   tipo: TipoMovimiento;
+  /** El cliente de una entrega. En una recepción, `null`. */
   cliente: Cliente | null;
+  /** A quién se entregó o de quién se recibió, para la bajada. `null` si no se sabe. */
+  destino: string | null;
   alTerminar(): void;
 }) {
+  const { estado, perfil } = useEstado();
   const [copiado, setCopiado] = useState(false);
 
+  // El texto de WhatsApp es el de siempre: el remito no entra en el mensaje.
   const texto = textoComprobante({ tipo, series: lote.series, cliente, fecha: lote.fecha });
+  const whatsapp =
+    cliente !== null && cliente.telefono.trim() !== '' ? linkWhatsApp(cliente.telefono, texto) : null;
+
+  const n = lote.series.length;
+  const cilindros = n === 1 ? '1 cilindro' : `${n} cilindros`;
+  const bajada =
+    n === 0
+      ? 'No se grabó ningún cilindro'
+      : tipo === 'entrega'
+        ? `${cilindros} ${n === 1 ? 'entregado' : 'entregados'}${destino === null ? '' : ` a ${destino}`}`
+        : `${cilindros} ${n === 1 ? 'recibido' : 'recibidos'}${destino === null ? '' : ` de ${destino}`}`;
 
   async function copiar() {
     try {
@@ -33,70 +60,133 @@ export function Comprobante({
     }
   }
 
+  const botonCopiar = (
+    <button
+      type="button"
+      onClick={() => void copiar()}
+      className="h-[50px] w-full rounded-[15px] border-[1.5px] border-linea-fuerte bg-white text-base font-semibold active:bg-fondo"
+    >
+      {copiado ? 'Copiado' : 'Copiar texto'}
+    </button>
+  );
+
   return (
-    <>
-      <Encabezado
-        titulo={tipo === 'entrega' ? 'Entrega confirmada' : 'Devolución confirmada'}
-        bajada={`${formatearFecha(lote.fecha)}${cliente === null ? '' : ` · ${cliente.nombre}`}`}
-      />
+    <div className="px-4 pt-10 pb-8">
+      <div className="flex flex-col items-center text-center">
+        <span className="flex size-20 items-center justify-center rounded-full bg-gracia text-white">
+          <Tilde className="size-10" trazo={2.6} />
+        </span>
+        <h1 className="mt-4 font-titulo text-[29px] leading-tight font-bold tracking-tight">
+          Lote confirmado
+        </h1>
+        <p className="mt-1 text-base text-tinta-2">{bajada}</p>
+      </div>
 
-      <div className="px-4 pt-4 pb-6">
-        <div className="rounded-xl border border-slate-200 bg-white">
-          <p className="border-b border-slate-200 px-4 py-3 text-sm text-slate-500">
-            {lote.series.length === 1 ? '1 cilindro' : `${lote.series.length} cilindros`}
-          </p>
+      <dl className="mt-7 divide-y divide-linea rounded-2xl border border-linea bg-white">
+        <Dato termino="Fecha">
+          {formatearFecha(lote.fecha)} · {lote.hora}
+        </Dato>
+        <Dato termino="Operador">{perfil.nombre}</Dato>
+        {lote.numero !== null && (
+          <Dato termino="Remito">
+            <span className="font-mono font-bold">{formatearRemito(lote.numero)}</span>
+          </Dato>
+        )}
+      </dl>
 
-          <ul className="divide-y divide-slate-100">
-            {lote.series.map((serie, i) => (
-              <li key={`${serie}-${i}`} className="px-4 py-3 font-mono text-base font-semibold">
-                {serie}
-              </li>
-            ))}
+      {n > 0 && (
+        <>
+          <h2 className="mt-6 mb-2 text-xs font-bold tracking-wider text-tinta-2 uppercase">
+            Cilindros del lote
+          </h2>
+          <ul className="divide-y divide-linea rounded-2xl border border-linea bg-white">
+            {lote.series.map((serie, i) => {
+              const cilindro = cilindroPorSerie(estado, serie);
+              return (
+                <li key={`${serie}-${i}`} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <span className="font-mono text-[17px] font-bold">{serie}</span>
+                  {cilindro !== null && (
+                    <span className="text-sm text-tinta-2">
+                      {cilindro.tamano === 'grande' ? 'Grande' : 'Chico'} · {cilindro.tipoGas}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
-        </div>
+        </>
+      )}
 
-        {lote.avisos.length > 0 && (
-          <div className="mt-4 rounded-xl border border-vencer-borde bg-vencer-suave p-4">
-            <p className="text-sm font-semibold text-vencer">Avisos del lote</p>
-            <ul className="mt-2 space-y-1">
+      {lote.avisos.length > 0 && (
+        <div className="mt-4 flex gap-2.5 rounded-2xl border border-vencer-borde bg-vencer-suave p-4 text-vencer">
+          <Alerta className="mt-0.5 size-5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold">Avisos del lote</p>
+            <ul className="mt-1 space-y-1">
               {lote.avisos.map((a, i) => (
-                <li key={`${a.serie}-${i}`} className="text-sm text-vencer">
+                <li key={`${a.serie}-${i}`} className="text-sm">
                   {a.mensaje}
                 </li>
               ))}
             </ul>
           </div>
-        )}
+        </div>
+      )}
 
-        <div className="mt-5 space-y-2">
-          <button
-            type="button"
-            onClick={() => void copiar()}
-            className="h-13 w-full rounded-xl border border-slate-900 py-3.5 text-base font-semibold active:bg-slate-100"
-          >
-            {copiado ? 'Copiado' : 'Copiar como texto'}
-          </button>
+      {n > 0 && (
+        <p className="mt-4 flex gap-2 text-sm text-tinta-2">
+          <Reloj className="mt-0.5 size-4 shrink-0" />
+          {tipo === 'entrega'
+            ? `El reloj arranca hoy. Los primeros ${DIAS_GRACIA} días no generan cargo.`
+            : `El reloj de ${n === 1 ? 'este cilindro' : 'estos cilindros'} se detuvo hoy.`}
+        </p>
+      )}
 
-          {cliente !== null && cliente.telefono.trim() !== '' && (
+      <div className="mt-6 space-y-2">
+        {whatsapp !== null ? (
+          <>
             <a
-              href={linkWhatsApp(cliente.telefono, texto)}
+              href={whatsapp}
               target="_blank"
               rel="noreferrer"
-              className="flex h-13 w-full items-center justify-center rounded-xl border border-slate-900 py-3.5 text-base font-semibold active:bg-slate-100"
+              className="flex h-[58px] w-full items-center justify-center gap-2 rounded-[15px] bg-tinta font-titulo text-[17px] font-bold text-white active:bg-marca-tinta"
             >
+              <WhatsApp className="size-5" trazo={2} />
               Mandar por WhatsApp
             </a>
-          )}
-
-          <button
-            type="button"
-            onClick={alTerminar}
-            className="h-14 w-full rounded-xl bg-slate-900 text-base font-semibold text-white active:bg-slate-700"
-          >
-            Listo
-          </button>
-        </div>
+            <div className="grid grid-cols-2 gap-2">
+              {botonCopiar}
+              <button
+                type="button"
+                onClick={alTerminar}
+                className="h-[50px] w-full rounded-[15px] border-[1.5px] border-linea-fuerte bg-white text-base font-semibold active:bg-fondo"
+              >
+                Escanear otro
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={alTerminar}
+              className="h-[58px] w-full rounded-[15px] bg-tinta font-titulo text-[17px] font-bold text-white active:bg-marca-tinta"
+            >
+              Escanear otro
+            </button>
+            {botonCopiar}
+          </>
+        )}
       </div>
-    </>
+    </div>
+  );
+}
+
+function Dato({ termino, children }: { termino: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <dt className="text-sm text-tinta-2">{termino}</dt>
+      <dd className="text-right text-base font-semibold">{children}</dd>
+    </div>
   );
 }

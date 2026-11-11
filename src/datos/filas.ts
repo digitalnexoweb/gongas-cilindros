@@ -130,6 +130,7 @@ export function armarEstado(filas: Filas, operador: string): EstadoApp {
       fecha: fecha(m.fecha),
       loteId: m.lote_id,
       operador: m.operador,
+      creadoEn: m.creado_en,
     }));
 
   return { version: 1, operador, clientes, cilindros, arriendos, movimientos };

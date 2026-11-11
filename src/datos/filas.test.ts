@@ -85,6 +85,16 @@ describe('armarEstado', () => {
     expect(() => armarEstado(filas, 'Joaquín')).toThrow(/Fecha inválida/);
   });
 
+  it('trae el momento en que se grabó cada movimiento, para mostrar la hora', () => {
+    const estado = armarEstado(filasDeJoaquin(), 'Joaquín');
+
+    expect(estado.movimientos.map((m) => m.creadoEn)).toEqual([
+      '2026-08-06T12:00:00+00:00',
+      '2026-08-18T12:00:00+00:00',
+      '2026-10-27T15:00:00+00:00',
+    ]);
+  });
+
   it('ordena los movimientos por el momento en que se grabaron', () => {
     const estado = armarEstado(filasDeJoaquin(), 'Joaquín');
 

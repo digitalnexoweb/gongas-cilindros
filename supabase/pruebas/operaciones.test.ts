@@ -12,7 +12,9 @@ import { crearBase, type Base, type Sesion } from './base';
 
 type Lote = {
   lote_id: string;
+  numero: number | null;
   fecha: string;
+  hora: string;
   movimientos: { id: string; tipo: string; serie: string; cliente_id: string | null }[];
   avisos: { serie: string; tipo: string }[];
 };
@@ -423,5 +425,79 @@ describe('alta_cilindro', () => {
 
     expect(lote.avisos).toEqual([]);
     expect((await abiertoDe('ALTA-00009'))?.cliente_id).toBe(ancap);
+  });
+});
+
+// ───────────────────────────────────────── El número de remito (0007)
+
+describe('el número de lote', () => {
+  it('cada lote toma el número siguiente al anterior', async () => {
+    const [uno, otro] = await cilindrosNuevos(2);
+
+    const primero = await confirmar(ana, 'entrega', [uno!], ancap);
+    const segundo = await confirmar(beto, 'entrega', [otro!], armada);
+
+    expect(primero.numero).not.toBeNull();
+    expect(segundo.numero).toBe(primero.numero! + 1);
+  });
+
+  it('todos los movimientos de un lote llevan el mismo número', async () => {
+    const series = await cilindrosNuevos(3);
+
+    const lote = await confirmar(ana, 'entrega', series, ancap);
+
+    const numeros = await base.duenio.filas<{ lote_numero: number }>(
+      'select distinct lote_numero from public.movimientos where lote_id = $1',
+      [lote.lote_id],
+    );
+    expect(numeros).toEqual([{ lote_numero: lote.numero }]);
+  });
+
+  it('un lote sin ningún movimiento no gasta número', async () => {
+    const [antes] = await cilindrosNuevos(1);
+    const [despues] = await cilindrosNuevos(1);
+
+    const primero = await confirmar(ana, 'entrega', [antes!], ancap);
+    // Solo series desconocidas: no se graba nada, así que no hay remito.
+    const vacio = await confirmar(ana, 'entrega', ['NO-EXISTE-1', 'NO-EXISTE-2'], ancap);
+    const siguiente = await confirmar(ana, 'entrega', [despues!], ancap);
+
+    expect(vacio.numero).toBeNull();
+    expect(vacio.movimientos).toEqual([]);
+    expect(siguiente.numero).toBe(primero.numero! + 1);
+  });
+
+  it('dos personas que confirman lotes nunca reciben el mismo número', async () => {
+    const series = await cilindrosNuevos(6);
+    const usuarios = [ana, beto, ana, beto, ana, beto];
+
+    const numeros: (number | null)[] = [];
+    for (const [i, serie] of series.entries()) {
+      numeros.push((await confirmar(usuarios[i]!, 'entrega', [serie], ancap)).numero);
+    }
+
+    expect(new Set(numeros).size).toBe(6);
+    expect(numeros.every((n) => n !== null)).toBe(true);
+  });
+
+  it('devuelve la hora del servidor en Montevideo', async () => {
+    const [serie] = await cilindrosNuevos(1);
+
+    const lote = await confirmar(ana, 'entrega', [serie!], ancap);
+
+    expect(lote.hora).toMatch(/^([01]\d|2[0-3]):[0-5]\d$/);
+    const [esperada] = await base.duenio.filas<{ hora: string }>(
+      "select to_char(now() at time zone 'America/Montevideo', 'HH24:MI') as hora",
+    );
+    expect(lote.hora).toBe(esperada?.hora);
+  });
+
+  it('nadie puede tocar la numeración directamente', async () => {
+    await expect(
+      base.como(ana, (s) => s.filas("select nextval('public.numero_de_lote')")),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      base.como(joaquin, (s) => s.filas("select setval('public.numero_de_lote', 1)")),
+    ).rejects.toThrow(/permission denied/);
   });
 });
