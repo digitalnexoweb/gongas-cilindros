@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { formatearFecha, formatearPesos, tarifaDiaria } from '../../dominio/arriendo';
 import {
   arriendosDe,
@@ -10,7 +12,9 @@ import {
 import { useEstado } from '../../estado/ProveedorEstado';
 import type { EstadoApp } from '../../dominio/tipos';
 import { ChipEstado, estadoVisible } from '../ChipEstado';
+import { BotonEditar } from '../BotonEditar';
 import { Bloque, Dato } from '../Dato';
+import { EditarCilindro } from '../EditarCilindro';
 import { Encabezado } from '../Encabezado';
 import { Importe } from '../Importe';
 import { nombreTamano } from './PantallaCilindros';
@@ -23,7 +27,8 @@ export function FichaCilindro({
   cilindroId: string;
   alVolver(): void;
 }) {
-  const { estado, hoy } = useEstado();
+  const { estado, hoy, perfil } = useEstado();
+  const [editando, setEditando] = useState(false);
   const cilindro = cilindroPorId(estado, cilindroId);
 
   if (cilindro === null) {
@@ -38,6 +43,16 @@ export function FichaCilindro({
   const vista = vistaCilindro(estado, cilindro, hoy);
   const historial = historialDe(estado, cilindro.id);
 
+  if (editando) {
+    return (
+      <EditarCilindro
+        cilindro={cilindro}
+        enUnCliente={vista.ubicacion.lugar === 'cliente'}
+        alVolver={() => setEditando(false)}
+      />
+    );
+  }
+
   // En stock, el último arriendo cerrado es lo que muestra el reloj detenido.
   const ultimoCerrado =
     vista.arriendo === null
@@ -46,9 +61,20 @@ export function FichaCilindro({
 
   return (
     <>
-      <Encabezado titulo={cilindro.serie} bajada={cilindro.tipoGas} alVolver={alVolver} />
+      <Encabezado
+        titulo={cilindro.serie}
+        bajada={cilindro.tipoGas}
+        alVolver={alVolver}
+        accion={perfil.rol === 'admin' ? <BotonEditar alTocar={() => setEditando(true)} /> : undefined}
+      />
 
       <div className="pb-4">
+        {!cilindro.activo && (
+          <p className="mx-4 mt-4 rounded-xl border border-vencer-borde bg-vencer-suave p-3 text-sm font-semibold text-vencer">
+            Dado de baja. Queda con su historial, pero no debería volver a entregarse.
+          </p>
+        )}
+
         <Bloque titulo="Dónde está">
           <Dato etiqueta="Ubicación">
             {vista.ubicacion.lugar === 'cliente' ? vista.ubicacion.cliente.nombre : 'En stock'}

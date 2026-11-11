@@ -34,6 +34,11 @@ export type Sesion =
 type ContextoSesion = {
   sesion: Sesion;
   ingresar(mail: string, clave: string): Promise<void>;
+  /**
+   * La cuenta nace desactivada; la sesión queda abierta y muestra eso. `false`
+   * si Supabase pide confirmar el mail primero.
+   */
+  crearCuenta(nombre: string, mail: string, clave: string): Promise<boolean>;
   cerrarSesion(): Promise<void>;
   reintentar(): void;
 };
@@ -55,6 +60,10 @@ type ContextoEstado = {
   /** Da de alta un cliente, recarga y devuelve su id. */
   altaCliente(datos: Omit<Cliente, 'id'>): Promise<string>;
   altaCilindro(serie: string, tamano: Tamano): Promise<void>;
+  /** Solo el administrador; la base lo rechaza para los demás. Recargan al terminar. */
+  editarCliente(id: string, datos: Omit<Cliente, 'id'>): Promise<void>;
+  editarCilindro(id: string, cambios: repositorio.CambiosCilindro): Promise<void>;
+  cambiarTarifaPorTamano(tamano: Tamano, tarifa: number): Promise<number>;
 };
 
 const ContextoDeSesion = createContext<ContextoSesion | null>(null);
@@ -170,6 +179,7 @@ export function ProveedorEstado({ children }: { children: ReactNode }) {
     () => ({
       sesion,
       ingresar: repositorio.ingresar,
+      crearCuenta: repositorio.crearCuenta,
       cerrarSesion: repositorio.cerrarSesion,
       reintentar: () => setIntento((n) => n + 1),
     }),
@@ -198,6 +208,19 @@ export function ProveedorEstado({ children }: { children: ReactNode }) {
       async altaCilindro(serie, tamano) {
         await repositorio.altaCilindro(serie, tamano);
         await recargar();
+      },
+      async editarCliente(id, datos) {
+        await repositorio.editarCliente(id, datos);
+        await recargar();
+      },
+      async editarCilindro(id, cambios) {
+        await repositorio.editarCilindro(id, cambios);
+        await recargar();
+      },
+      async cambiarTarifaPorTamano(tamano, tarifa) {
+        const cambiados = await repositorio.cambiarTarifaPorTamano(tamano, tarifa);
+        await recargar();
+        return cambiados;
       },
     };
   }, [sesion, hoy, recargar]);

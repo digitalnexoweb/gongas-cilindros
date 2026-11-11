@@ -52,6 +52,9 @@ function evaluar(
   const base = { serie, conocido: true, tamano: cilindro.tamano, tipoGas: cilindro.tipoGas };
   const ubicacion = ubicacionDe(estado, cilindro.id);
 
+  // Avisa, no bloquea: si lo tienen en la mano, la realidad del depósito manda.
+  if (!cilindro.activo && tipo === 'entrega') return { ...base, aviso: 'Está dado de baja' };
+
   if (tipo === 'entrega') {
     if (ubicacion.lugar !== 'cliente') return { ...base, aviso: null };
 

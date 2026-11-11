@@ -1,22 +1,44 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import { formatearFecha } from '../../dominio/arriendo';
 import { vistaClientes } from '../../dominio/consultas';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { ChipEstado, estadoVisible } from '../ChipEstado';
 import { Bloque, Dato } from '../Dato';
+import { BotonEditar } from '../BotonEditar';
 import { Encabezado } from '../Encabezado';
+import { FormularioCliente } from '../FormularioCliente';
 import { Importe } from '../Importe';
 import { nombreTamano } from './PantallaCilindros';
 import { nombreTipoCliente } from './PantallaClientes';
 
-/** La sección 6.3: el detalle de cada cilindro del cliente, con sus días y su importe. */
+/**
+ * La sección 6.3: el detalle de cada cilindro del cliente, con sus días y su
+ * importe. El administrador además puede corregir sus datos.
+ */
 export function FichaCliente({ clienteId, alVolver }: { clienteId: string; alVolver(): void }) {
-  const { estado, hoy } = useEstado();
+  const { estado, hoy, perfil, editarCliente } = useEstado();
+  const [editando, setEditando] = useState(false);
   const vista = useMemo(
     () => vistaClientes(estado, hoy).find((v) => v.cliente.id === clienteId) ?? null,
     [estado, hoy, clienteId],
   );
+
+  if (vista !== null && editando) {
+    const { id: _id, ...datos } = vista.cliente;
+    return (
+      <FormularioCliente
+        titulo="Editar cliente"
+        textoBoton="Guardar"
+        inicial={datos}
+        alVolver={() => setEditando(false)}
+        alGuardar={async (nuevos) => {
+          await editarCliente(clienteId, nuevos);
+          setEditando(false);
+        }}
+      />
+    );
+  }
 
   if (vista === null) {
     return (
@@ -35,6 +57,7 @@ export function FichaCliente({ clienteId, alVolver }: { clienteId: string; alVol
         titulo={cliente.nombre}
         bajada={nombreTipoCliente[cliente.tipo]}
         alVolver={alVolver}
+        accion={perfil.rol === 'admin' ? <BotonEditar alTocar={() => setEditando(true)} /> : undefined}
       />
 
       <div className="pb-4">

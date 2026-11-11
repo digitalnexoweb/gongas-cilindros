@@ -49,6 +49,36 @@ export async function ingresar(mail: string, clave: string): Promise<void> {
 }
 
 /**
+ * Crea una cuenta nueva. Nace desactivada (migración 0004): no ve nada hasta
+ * que el administrador la activa desde Ajustes → Usuarios.
+ *
+ * Devuelve `false` si Supabase pide confirmar el mail antes de entrar: ahí no
+ * queda sesión abierta y hay que avisarlo en pantalla.
+ */
+export async function crearCuenta(nombre: string, mail: string, clave: string): Promise<boolean> {
+  const { data, error } = await supabase.auth.signUp({
+    email: mail,
+    password: clave,
+    // La base toma el nombre de acá para armar el perfil (crear_perfil, 0002).
+    options: { data: { nombre } },
+  });
+  if (error === null) return data.session !== null;
+
+  const mensaje = error.message;
+  if (/fetch|network/i.test(mensaje)) throw new Error('No hay conexión. Probá de nuevo.');
+  if (/already|registered|exists/i.test(mensaje)) {
+    throw new Error('Ya hay una cuenta con ese mail. Probá entrar con ella.');
+  }
+  if (/signups? (are )?not allowed|disabled/i.test(mensaje)) {
+    throw new Error('Por ahora no se pueden crear cuentas. Avisale al administrador.');
+  }
+  if (/password/i.test(mensaje)) {
+    throw new Error('La contraseña no sirve: probá con una más larga, de 8 o más caracteres.');
+  }
+  throw new Error('No se pudo crear la cuenta. Probá de nuevo.');
+}
+
+/**
  * Cierra la sesión en este dispositivo y en ningún otro. Por defecto Supabase
  * la cierra en todos, y no es lo que se quiere: un empleado que sale en un
  * celular no tiene por qué quedar afuera en los demás.
@@ -205,6 +235,108 @@ export async function altaCliente(datos: Omit<Cliente, 'id'>): Promise<string> {
 export async function altaCilindro(serie: string, tamano: Tamano): Promise<void> {
   const { error } = await supabase.rpc('alta_cilindro', { p_serie: serie, p_tamano: tamano });
   if (error !== null) throw falla(error);
+}
+
+// ───────────────────────────────────────────────────────── Administrar
+//
+// Todo esto es del administrador. La base lo verifica por su cuenta: si un
+// empleado lo intentara, las funciones tiran "No autorizado" y las reglas por
+// fila no le dejan tocar ninguna fila.
+
+export type Usuario = Perfil & {
+  email: string;
+  creadoEn: string;
+};
+
+/** Todas las cuentas, con su mail. Primero las que esperan activación. */
+export async function listarUsuarios(): Promise<Usuario[]> {
+  const { data, error } = await supabase.rpc('usuarios');
+  if (error !== null) throw falla(error);
+
+  return (data as (Perfil & { email: string; creado_en: string })[]).map((u) => ({
+    id: u.id,
+    email: u.email,
+    nombre: u.nombre,
+    rol: u.rol,
+    activo: u.activo,
+    creadoEn: u.creado_en,
+  }));
+}
+
+export async function editarUsuario(
+  id: string,
+  datos: Pick<Perfil, 'nombre' | 'rol' | 'activo'>,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('perfiles')
+    .update({ nombre: datos.nombre, rol: datos.rol, activo: datos.activo })
+    .eq('id', id)
+    .select('id');
+
+  if (error !== null) throw falla(error);
+  if ((data ?? []).length === 0) throw new Error('No tenés permiso para hacer eso.');
+}
+
+export async function editarCliente(id: string, datos: Omit<Cliente, 'id'>): Promise<void> {
+  const { data, error } = await supabase
+    .from('clientes')
+    .update({
+      nombre: datos.nombre,
+      tipo: datos.tipo,
+      documento: datos.documento,
+      telefono: datos.telefono,
+    })
+    .eq('id', id)
+    .select('id');
+
+  if (error !== null) throw falla(error);
+  // Sin permiso, la regla por fila no tira error: simplemente no toca nada.
+  if ((data ?? []).length === 0) throw new Error('No tenés permiso para hacer eso.');
+}
+
+export type CambiosCilindro = {
+  tamano: Tamano;
+  tipoGas: string;
+  tarifaMensual: number;
+  activo: boolean;
+};
+
+/** Tamaño, gas, tarifa y baja, todo junto o nada. La serie no se edita. */
+export async function editarCilindro(id: string, cambios: CambiosCilindro): Promise<void> {
+  const { error } = await supabase.rpc('editar_cilindro', {
+    p_id: id,
+    p_tamano: cambios.tamano,
+    p_tipo_gas: cambios.tipoGas,
+    p_tarifa: cambios.tarifaMensual,
+    p_activo: cambios.activo,
+  });
+  if (error !== null) throw falla(error);
+}
+
+/** El precio por defecto de cada tamaño, con el que nace un cilindro nuevo. */
+export async function tarifasPorTamano(): Promise<Record<Tamano, number>> {
+  const { data, error } = await supabase.from('tarifas_por_tamano').select('tamano, tarifa_mensual');
+  if (error !== null) throw falla(error);
+
+  const filas = (data ?? []) as { tamano: Tamano; tarifa_mensual: number | string }[];
+  const chico = filas.find((f) => f.tamano === 'chico');
+  const grande = filas.find((f) => f.tamano === 'grande');
+  if (chico === undefined || grande === undefined) throw new Error('No tenés permiso para ver las tarifas.');
+
+  return { chico: Number(chico.tarifa_mensual), grande: Number(grande.tarifa_mensual) };
+}
+
+/**
+ * Cambia el precio de un tamaño y el de cada cilindro que tenía el precio viejo.
+ * Devuelve cuántos cilindros cambiaron.
+ */
+export async function cambiarTarifaPorTamano(tamano: Tamano, tarifa: number): Promise<number> {
+  const { data, error } = await supabase.rpc('cambiar_tarifa_por_tamano', {
+    p_tamano: tamano,
+    p_tarifa: tarifa,
+  });
+  if (error !== null) throw falla(error);
+  return data as number;
 }
 
 // ───────────────────────────────────────────────────────── Enterarse

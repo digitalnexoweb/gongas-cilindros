@@ -14,6 +14,8 @@ import { PantallaEscaneo } from './ui/pantallas/PantallaEscaneo';
 import { PantallaEtiquetas } from './ui/pantallas/PantallaEtiquetas';
 import { PantallaIngreso } from './ui/pantallas/PantallaIngreso';
 import { PantallaResumen } from './ui/pantallas/PantallaResumen';
+import { PantallaTarifas } from './ui/pantallas/PantallaTarifas';
+import { PantallaUsuarios } from './ui/pantallas/PantallaUsuarios';
 
 /**
  * Lo que se apila encima de la pestaña actual. Es una pila, así que Ajustes
@@ -23,7 +25,9 @@ type Capa =
   | { tipo: 'cilindro'; id: string }
   | { tipo: 'cliente'; id: string }
   | { tipo: 'ajustes' }
-  | { tipo: 'etiquetas' };
+  | { tipo: 'etiquetas' }
+  | { tipo: 'usuarios' }
+  | { tipo: 'tarifas' };
 
 export function App() {
   return (
@@ -157,9 +161,13 @@ function Armazon() {
         <PantallaAjustes
           alVolver={cerrar}
           alAbrirEtiquetas={() => abrir({ tipo: 'etiquetas' })}
+          alAbrirUsuarios={() => abrir({ tipo: 'usuarios' })}
+          alAbrirTarifas={() => abrir({ tipo: 'tarifas' })}
         />
       )}
       {capa?.tipo === 'etiquetas' && <PantallaEtiquetas alVolver={cerrar} />}
+      {capa?.tipo === 'usuarios' && <PantallaUsuarios alVolver={cerrar} />}
+      {capa?.tipo === 'tarifas' && <PantallaTarifas alVolver={cerrar} />}
 
       {conNavegacion && <NavegacionInferior activa={pestana} alElegir={irA} enCargo={enCargo} />}
     </div>

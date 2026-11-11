@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 
-import type { Cliente, TipoCliente } from '../../dominio/tipos';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { Buscador } from '../Buscador';
 import { Encabezado } from '../Encabezado';
+import { FormularioCliente } from '../FormularioCliente';
 
 /** El paso 2 de la sección 6.1: elegir cliente, o darlo de alta en el momento. */
 export function ElegirCliente({
@@ -26,8 +26,10 @@ export function ElegirCliente({
   if (dandoDeAlta) {
     return (
       <FormularioCliente
+        titulo="Cliente nuevo"
+        textoBoton="Crear y seguir"
         alVolver={() => setDandoDeAlta(false)}
-        alCrear={async (datos) => alElegir(await altaCliente(datos))}
+        alGuardar={async (datos) => alElegir(await altaCliente(datos))}
       />
     );
   }
@@ -74,126 +76,5 @@ export function ElegirCliente({
         </button>
       </div>
     </>
-  );
-}
-
-/** El alta mínima de 6.1: nombre, tipo, documento y teléfono. */
-function FormularioCliente({
-  alCrear,
-  alVolver,
-}: {
-  alCrear(datos: Omit<Cliente, 'id'>): Promise<void>;
-  alVolver(): void;
-}) {
-  const [nombre, setNombre] = useState('');
-  const [tipo, setTipo] = useState<TipoCliente>('empresa');
-  const [documento, setDocumento] = useState('');
-  const [telefono, setTelefono] = useState('+598');
-
-  const [creando, setCreando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const listo = nombre.trim() !== '' && !creando;
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!listo) return;
-
-        setCreando(true);
-        setError(null);
-        alCrear({
-          nombre: nombre.trim(),
-          tipo,
-          documento: documento.trim(),
-          telefono: telefono.trim(),
-        })
-          .catch((falla: unknown) => {
-            setError(falla instanceof Error ? falla.message : 'No se pudo crear el cliente.');
-          })
-          .finally(() => setCreando(false));
-      }}
-    >
-      <Encabezado titulo="Cliente nuevo" alVolver={alVolver} />
-
-      <div className="space-y-4 px-4 pt-4">
-        <Campo etiqueta="Nombre" valor={nombre} alCambiar={setNombre} autoFoco />
-
-        <div>
-          <span className="block text-sm font-medium text-slate-700">Tipo</span>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {(['empresa', 'particular'] as const).map((opcion) => (
-              <button
-                key={opcion}
-                type="button"
-                onClick={() => setTipo(opcion)}
-                aria-pressed={tipo === opcion}
-                className={`h-12 rounded-xl border text-base ${
-                  tipo === opcion
-                    ? 'border-slate-900 bg-slate-900 font-medium text-white'
-                    : 'border-slate-300 bg-white text-slate-600'
-                }`}
-              >
-                {opcion === 'empresa' ? 'Empresa' : 'Particular'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <Campo
-          etiqueta={tipo === 'empresa' ? 'RUT' : 'Cédula'}
-          valor={documento}
-          alCambiar={setDocumento}
-          modo="numeric"
-        />
-        <Campo etiqueta="Teléfono" valor={telefono} alCambiar={setTelefono} modo="tel" />
-
-        {error !== null && (
-          <p
-            role="alert"
-            className="rounded-xl border border-cargo-borde bg-cargo-suave p-3 text-sm text-cargo"
-          >
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={!listo}
-          className="h-14 w-full rounded-xl bg-slate-900 text-base font-semibold text-white active:bg-slate-700 disabled:bg-slate-300"
-        >
-          {creando ? 'Creando…' : 'Crear y seguir'}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function Campo({
-  etiqueta,
-  valor,
-  alCambiar,
-  modo,
-  autoFoco = false,
-}: {
-  etiqueta: string;
-  valor: string;
-  alCambiar(nuevo: string): void;
-  modo?: 'numeric' | 'tel';
-  autoFoco?: boolean;
-}) {
-  return (
-    <label className="block">
-      <span className="block text-sm font-medium text-slate-700">{etiqueta}</span>
-      <input
-        type="text"
-        inputMode={modo}
-        autoFocus={autoFoco}
-        value={valor}
-        onChange={(e) => alCambiar(e.target.value)}
-        className="mt-1.5 h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-base focus:border-slate-900 focus:outline-none"
-      />
-    </label>
   );
 }
