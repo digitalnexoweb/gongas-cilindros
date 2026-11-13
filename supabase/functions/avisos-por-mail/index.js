@@ -206,11 +206,11 @@ function mailsPendientes(datos) {
 * Variables del servidor:
 *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY   las pone Supabase solo
 *   BREVO_API_KEY                             la carga el usuario en Secrets
-*   MAIL_REMITENTE                            opcional; por defecto info@gongasuruguay.com
+*   MAIL_REMITENTE                            opcional; por defecto vanesa@gongasuruguay.com
 *
 * Con el cuerpo `{"simular": true}` no manda nada: devuelve lo que mandaría.
 */
-const REMITENTE_POR_DEFECTO = "info@gongasuruguay.com";
+const REMITENTE_POR_DEFECTO = "vanesa@gongasuruguay.com";
 function json(cuerpo, estado = 200) {
 	return new Response(JSON.stringify(cuerpo, null, 2), {
 		status: estado,

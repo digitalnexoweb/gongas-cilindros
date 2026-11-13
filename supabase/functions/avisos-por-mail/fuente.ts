@@ -13,7 +13,7 @@
  * Variables del servidor:
  *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY   las pone Supabase solo
  *   BREVO_API_KEY                             la carga el usuario en Secrets
- *   MAIL_REMITENTE                            opcional; por defecto info@gongasuruguay.com
+ *   MAIL_REMITENTE                            opcional; por defecto vanesa@gongasuruguay.com
  *
  * Con el cuerpo `{"simular": true}` no manda nada: devuelve lo que mandaría.
  */
@@ -25,7 +25,7 @@ declare const Deno: {
   serve(manejador: (pedido: Request) => Response | Promise<Response>): void;
 };
 
-const REMITENTE_POR_DEFECTO = 'info@gongasuruguay.com';
+const REMITENTE_POR_DEFECTO = 'vanesa@gongasuruguay.com';
 
 function json(cuerpo: unknown, estado = 200): Response {
   return new Response(JSON.stringify(cuerpo, null, 2), {
