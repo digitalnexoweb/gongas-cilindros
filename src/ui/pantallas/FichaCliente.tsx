@@ -9,7 +9,7 @@ import { BotonEditar } from '../BotonEditar';
 import { Encabezado } from '../Encabezado';
 import { FormularioCliente } from '../FormularioCliente';
 import { Importe } from '../Importe';
-import { nombreTamano } from './PantallaCilindros';
+import { nombreKilos } from '../../dominio/tipos';
 import { nombreTipoCliente } from './PantallaClientes';
 
 /**
@@ -90,7 +90,7 @@ export function FichaCliente({ clienteId, alVolver }: { clienteId: string; alVol
 
                 <div className="mt-1 flex items-baseline justify-between gap-3">
                   <span className="truncate text-sm text-slate-500">
-                    {nombreTamano[cilindro.tamano]}
+                    {nombreKilos(cilindro.kg)}
                     {arriendo !== null && ` · desde el ${formatearFecha(arriendo.fechaEntrega)}`}
                     {calculo !== null && ` · ${calculo.dias} días`}
                   </span>

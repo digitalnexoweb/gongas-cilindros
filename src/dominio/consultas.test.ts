@@ -38,8 +38,8 @@ describe('la ubicacion se deduce, no se guarda', () => {
     expect(Object.keys(cilindro(estadoDemo(HOY), 'CIL-00101')).sort()).toEqual([
       'activo',
       'id',
+      'kg',
       'serie',
-      'tamano',
       'tarifaMensual',
       'tipoGas',
     ]);

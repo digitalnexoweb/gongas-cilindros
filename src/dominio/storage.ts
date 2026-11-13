@@ -9,7 +9,7 @@
 
 import { type FechaISO, sumarDias } from './arriendo';
 import {
-  TARIFA_POR_TAMANO,
+  TARIFA_POR_KILOS_DEMO,
   type Arriendo,
   type Cilindro,
   type Cliente,
@@ -113,7 +113,7 @@ export function reiniciarDemo(almacen: AlmacenCrudo, hoy: FechaISO): EstadoApp {
 type PlanCilindro = {
   id: string;
   serie: string;
-  tamano: 'chico' | 'grande';
+  kg: number;
   /** Cliente donde está, o `null` si está en stock. */
   clienteId: string | null;
   /** Hace cuántos días se entregó. */
@@ -137,22 +137,22 @@ export function estadoDemo(hoy: FechaISO, operador: string = ''): EstadoApp {
   ];
 
   const plan: PlanCilindro[] = [
-    { id: 'cil-00101', serie: 'CIL-00101', tamano: 'grande', clienteId: 'cli-ancap',   diasDesdeEntrega: 92 },
-    { id: 'cil-00102', serie: 'CIL-00102', tamano: 'grande', clienteId: 'cli-ancap',   diasDesdeEntrega: 75 },
-    { id: 'cil-00103', serie: 'CIL-00103', tamano: 'chico',  clienteId: 'cli-armada',  diasDesdeEntrega: 58 },
-    { id: 'cil-00104', serie: 'CIL-00104', tamano: 'chico',  clienteId: 'cli-pereira', diasDesdeEntrega: 20 },
-    { id: 'cil-00105', serie: 'CIL-00105', tamano: 'grande', clienteId: null },
-    { id: 'cil-00106', serie: 'CIL-00106', tamano: 'chico',  clienteId: null },
+    { id: 'cil-00101', serie: 'CIL-00101', kg: 7, clienteId: 'cli-ancap',   diasDesdeEntrega: 92 },
+    { id: 'cil-00102', serie: 'CIL-00102', kg: 7, clienteId: 'cli-ancap',   diasDesdeEntrega: 75 },
+    { id: 'cil-00103', serie: 'CIL-00103', kg: 4,  clienteId: 'cli-armada',  diasDesdeEntrega: 58 },
+    { id: 'cil-00104', serie: 'CIL-00104', kg: 4,  clienteId: 'cli-pereira', diasDesdeEntrega: 20 },
+    { id: 'cil-00105', serie: 'CIL-00105', kg: 7, clienteId: null },
+    { id: 'cil-00106', serie: 'CIL-00106', kg: 4,  clienteId: null },
     // Devuelto hace 10 días: queda en stock, pero con historial y un arriendo cerrado.
-    { id: 'cil-00107', serie: 'CIL-00107', tamano: 'chico',  clienteId: 'cli-pereira', diasDesdeEntrega: 80, diasDesdeDevolucion: 10 },
+    { id: 'cil-00107', serie: 'CIL-00107', kg: 4,  clienteId: 'cli-pereira', diasDesdeEntrega: 80, diasDesdeDevolucion: 10 },
   ];
 
   const cilindros: Cilindro[] = plan.map((p) => ({
     id: p.id,
     serie: p.serie,
     tipoGas: 'acetileno',
-    tamano: p.tamano,
-    tarifaMensual: TARIFA_POR_TAMANO[p.tamano],
+    kg: p.kg,
+    tarifaMensual: TARIFA_POR_KILOS_DEMO[p.kg] ?? null,
     activo: true,
   }));
 
@@ -225,8 +225,8 @@ export function altaCilindro(
     id: nuevoId(),
     serie: datos.serie,
     tipoGas: datos.tipoGas,
-    tamano: datos.tamano,
-    tarifaMensual: datos.tarifaMensual ?? TARIFA_POR_TAMANO[datos.tamano],
+    kg: datos.kg,
+    tarifaMensual: datos.tarifaMensual ?? TARIFA_POR_KILOS_DEMO[datos.kg] ?? null,
     activo: datos.activo ?? true,
   };
   return { estado: { ...estado, cilindros: [...estado.cilindros, cilindro] }, cilindro };

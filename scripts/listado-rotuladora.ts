@@ -9,11 +9,14 @@
  *   entregables/etiquetas-rotuladora.csv      el texto de cada QR, para las
  *                                             rotuladoras que los dibujan solas
  *
+ *   npm run etiquetas -- --codigos entregables/codigos-joaquin.txt
+ *                                   → los códigos de la lista, uno por línea
  *   npm run etiquetas -- 40         → 40 series, desde CIL-00001
  *   npm run etiquetas -- 20 41      → 20 series, desde CIL-00041
  *
- * Los cilindros de GONGAS no traen número propio, así que la numeración la
- * pone el sistema. El contenido de cada QR sale de `textoQR`, la misma función
+ * Los cilindros de Joaquín traen su propio código (762, 729026…): esos son los
+ * que van en la etiqueta, con `--codigos`. La numeración CIL-00001… queda para
+ * cilindros que no tengan código. El contenido de cada QR sale de `textoQR`, la misma función
  * que usa la app, y las medidas de la hoja son las de `hojas.ts`: lo que sale
  * de acá es lo mismo que imprime la pantalla de Etiquetas.
  *
@@ -22,7 +25,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -65,18 +68,45 @@ function serieNumero(n: number): string {
   return `CIL-${String(n).padStart(5, '0')}`;
 }
 
-const cantidad = Number(process.argv[2] ?? 40);
-const desde = Number(process.argv[3] ?? 1);
-
-if (!Number.isInteger(cantidad) || cantidad < 1 || !Number.isInteger(desde) || desde < 1) {
-  console.error('Uso: npm run etiquetas -- <cantidad> [desde]');
-  process.exit(1);
-}
-
-// ───────────────────────────────────────────────────────── Las series
-
 const series: string[] = [];
 const salteadas: string[] = [];
+
+/** Cada etiqueta tiene que poder leerla el escáner. Si no, mejor no generar nada. */
+function validar(serie: string): void {
+  if (!pareceSerie(serie) || serieDesdeQR(textoQR(serie)) !== serie) {
+    throw new Error(`La serie ${serie} no pasa la validación del escáner.`);
+  }
+}
+
+if (process.argv[2] === '--codigos') {
+  // ─────────────────────────────────────────────────────── Los códigos de una lista
+  const archivo = process.argv[3];
+  if (archivo === undefined) {
+    console.error('Uso: npm run etiquetas -- --codigos <archivo con un código por línea>');
+    process.exit(1);
+  }
+
+  const codigos = readFileSync(archivo, 'utf8')
+    .split(/\r?\n/)
+    .map((linea) => linea.trim().toUpperCase())
+    .filter((linea) => linea !== '' && !linea.startsWith('#'));
+
+  const repetidos = codigos.filter((c, i) => codigos.indexOf(c) !== i);
+  if (repetidos.length > 0) throw new Error(`Hay códigos repetidos en la lista: ${repetidos.join(', ')}`);
+
+  for (const codigo of codigos) {
+    validar(codigo);
+    series.push(codigo);
+  }
+} else {
+  // ─────────────────────────────────────────────────────── La numeración CIL-00001…
+  const cantidad = Number(process.argv[2] ?? 40);
+  const desde = Number(process.argv[3] ?? 1);
+
+  if (!Number.isInteger(cantidad) || cantidad < 1 || !Number.isInteger(desde) || desde < 1) {
+    console.error('Uso: npm run etiquetas -- <cantidad> [desde]   o   npm run etiquetas -- --codigos <archivo>');
+    process.exit(1);
+  }
 
 for (let n = desde; series.length < cantidad; n += 1) {
   if (n > 99_999) throw new Error('La numeración de 5 dígitos llega hasta CIL-99999.');
@@ -87,12 +117,9 @@ for (let n = desde; series.length < cantidad; n += 1) {
     continue;
   }
 
-  // Cada etiqueta tiene que poder leerla el escáner. Si no, mejor no generar nada.
-  if (!pareceSerie(serie) || serieDesdeQR(textoQR(serie)) !== serie) {
-    throw new Error(`La serie ${serie} no pasa la validación del escáner.`);
-  }
-
+  validar(serie);
   series.push(serie);
+}
 }
 
 mkdirSync(CARPETA, { recursive: true });

@@ -194,16 +194,16 @@ describe('altas', () => {
     expect(estado.clientes).toHaveLength(3);
   });
 
-  it('da de alta un cilindro con la tarifa de su tamano', () => {
+  it('da de alta un cilindro con la tarifa de su peso', () => {
     const { cilindro: grande } = altaCilindro(estadoDemo(HOY), {
       serie: 'CIL-00200',
       tipoGas: 'acetileno',
-      tamano: 'grande',
+      kg: 7,
     });
     const { cilindro: chico } = altaCilindro(estadoDemo(HOY), {
       serie: 'CIL-00201',
       tipoGas: 'acetileno',
-      tamano: 'chico',
+      kg: 4,
     });
 
     expect(grande.tarifaMensual).toBe(440);
@@ -215,7 +215,7 @@ describe('altas', () => {
     const { cilindro } = altaCilindro(estadoDemo(HOY), {
       serie: 'CIL-00202',
       tipoGas: 'acetileno',
-      tamano: 'chico',
+      kg: 4,
       tarifaMensual: 500,
     });
 

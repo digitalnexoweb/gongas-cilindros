@@ -13,7 +13,7 @@ import * as repositorio from '../datos/repositorio';
 import type { LoteConfirmado } from '../datos/repositorio';
 import type { Perfil } from '../datos/filas';
 import { hoyISO, type FechaISO } from '../dominio/arriendo';
-import type { Cliente, EstadoApp, Tamano, TextosAviso, TipoMovimiento } from '../dominio/tipos';
+import type { Cliente, EstadoApp, TextosAviso, TipoMovimiento } from '../dominio/tipos';
 
 /**
  * La sesión y la foto del estado.
@@ -69,16 +69,17 @@ type ContextoEstado = {
   ): Promise<LoteConfirmado>;
   /** Da de alta un cliente, recarga y devuelve su id. */
   altaCliente(datos: Omit<Cliente, 'id'>): Promise<string>;
-  altaCilindro(serie: string, tamano: Tamano, tipoGas?: string): Promise<void>;
+  altaCilindro(serie: string, kg: number, tipoGas?: string): Promise<void>;
   /** Cualquier usuario activo: es un dato físico del cilindro. */
-  corregirTamano(serie: string, tamano: Tamano): Promise<void>;
+  corregirKilos(serie: string, kg: number): Promise<void>;
   /** Solo el administrador. */
   agregarTipoGas(nombre: string, orden: number): Promise<void>;
   cambiarTipoGas(nombre: string, activo: boolean): Promise<void>;
   /** Solo el administrador; la base lo rechaza para los demás. Recargan al terminar. */
   editarCliente(id: string, datos: Omit<Cliente, 'id'>): Promise<void>;
   editarCilindro(id: string, cambios: repositorio.CambiosCilindro): Promise<void>;
-  cambiarTarifaPorTamano(tamano: Tamano, tarifa: number): Promise<number>;
+  cambiarTarifaDeKilos(kg: number, tarifa: number): Promise<number>;
+  agregarKilos(kg: number, tarifa: number): Promise<void>;
   /** Cualquier usuario activo. Recarga para que la fila muestre el aviso. */
   registrarAviso(arriendoId: string): Promise<void>;
   /** Solo el administrador. */
@@ -234,12 +235,12 @@ export function ProveedorEstado({ children }: { children: ReactNode }) {
         await recargar();
         return id;
       },
-      async altaCilindro(serie, tamano, tipoGas) {
-        await repositorio.altaCilindro(serie, tamano, tipoGas);
+      async altaCilindro(serie, kg, tipoGas) {
+        await repositorio.altaCilindro(serie, kg, tipoGas);
         await recargar();
       },
-      async corregirTamano(serie, tamano) {
-        await repositorio.corregirTamano(serie, tamano);
+      async corregirKilos(serie, kg) {
+        await repositorio.corregirKilos(serie, kg);
         await recargar();
       },
       async agregarTipoGas(nombre, orden) {
@@ -258,10 +259,14 @@ export function ProveedorEstado({ children }: { children: ReactNode }) {
         await repositorio.editarCilindro(id, cambios);
         await recargar();
       },
-      async cambiarTarifaPorTamano(tamano, tarifa) {
-        const cambiados = await repositorio.cambiarTarifaPorTamano(tamano, tarifa);
+      async cambiarTarifaDeKilos(kg, tarifa) {
+        const cambiados = await repositorio.cambiarTarifaDeKilos(kg, tarifa);
         await recargar();
         return cambiados;
+      },
+      async agregarKilos(kg, tarifa) {
+        await repositorio.agregarKilos(kg, tarifa);
+        await recargar();
       },
       async registrarAviso(arriendoId) {
         await repositorio.registrarAviso(arriendoId);

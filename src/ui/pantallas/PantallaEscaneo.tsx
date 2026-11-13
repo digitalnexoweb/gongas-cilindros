@@ -4,7 +4,7 @@ import type { LoteConfirmado } from '../../datos/repositorio';
 import { formatearPesos } from '../../dominio/arriendo';
 import { cilindroPorSerie, ubicacionDe } from '../../dominio/consultas';
 import { serieDesdeQR, serieTipeada } from '../../dominio/qr';
-import type { EstadoApp, Tamano, TipoMovimiento } from '../../dominio/tipos';
+import type { EstadoApp, TipoMovimiento } from '../../dominio/tipos';
 import { senalDeLectura } from '../../escaneo/senales';
 import { useEscaner } from '../../escaneo/useEscaner';
 import { useEstado } from '../../estado/ProveedorEstado';
@@ -14,6 +14,7 @@ import { ElegirCliente } from '../escaneo/ElegirCliente';
 import { ultimosLotes } from '../escaneo/ultimosLotes';
 import { Visor } from '../escaneo/Visor';
 import { Adelante, Alerta, Atras, Cruz, FlechaDerecha, FlechaIzquierda, Tilde } from '../iconos';
+import { ElegirKilos, pesosActivos } from '../ElegirKilos';
 import { paraCobrar } from '../paraCobrar';
 
 type Paso =
@@ -31,7 +32,7 @@ type ItemLote = {
   serie: string;
   /** `false` si la serie no está en el sistema: 6.1 ofrece darla de alta. */
   conocido: boolean;
-  tamano: Tamano | null;
+  kg: number | null;
   tipoGas: string | null;
   /** El ámbar de 6.1. Avisa, no bloquea. */
   aviso: string | null;
@@ -46,10 +47,10 @@ function evaluar(
 ): ItemLote {
   const cilindro = cilindroPorSerie(estado, serie);
   if (cilindro === null) {
-    return { serie, conocido: false, tamano: null, tipoGas: null, aviso: 'No está en el sistema' };
+    return { serie, conocido: false, kg: null, tipoGas: null, aviso: 'No está en el sistema' };
   }
 
-  const base = { serie, conocido: true, tamano: cilindro.tamano, tipoGas: cilindro.tipoGas };
+  const base = { serie, conocido: true, kg: cilindro.kg, tipoGas: cilindro.tipoGas };
   const ubicacion = ubicacionDe(estado, cilindro.id);
 
   // Avisa, no bloquea: si lo tienen en la mano, la realidad del depósito manda.
@@ -97,7 +98,8 @@ export function PantallaEscaneo({
    */
   alCambiarFlujo(enFlujo: boolean): void;
 }) {
-  const { estado, perfil, hoy, confirmarLote, corregirTamano } = useEstado();
+  const { estado, perfil, hoy, confirmarLote, corregirKilos } = useEstado();
+  const pesos = useMemo(() => pesosActivos(estado.pesos), [estado.pesos]);
 
   // Los gases que se ofrecen al entregar, en el orden de la lista.
   const gasesActivos = useMemo(() => {
@@ -382,7 +384,8 @@ export function PantallaEscaneo({
                 gas={gasDe(item)}
                 gases={gasesActivos}
                 alCambiarGas={(gas) => setGases((xs) => ({ ...xs, [item.serie]: gas }))}
-                alCorregirTamano={(tamano) => corregirTamano(item.serie, tamano)}
+                pesos={pesos}
+                alCorregirKilos={(kg) => corregirKilos(item.serie, kg)}
                 alDarDeAlta={() => setADarDeAlta(item.serie)}
                 alSacar={() => setSeries((xs) => xs.filter((s) => s !== item.serie))}
               />
@@ -412,7 +415,7 @@ export function PantallaEscaneo({
             type="text"
             value={serieManual}
             onChange={(e) => setSerieManual(e.target.value)}
-            placeholder="Cargar a mano, ej. CIL-00001"
+            placeholder="Cargar a mano, ej. 729026"
             autoCapitalize="characters"
             className="h-12 min-w-0 flex-1 rounded-[15px] border-[1.5px] border-linea-fuerte bg-white px-4 font-mono text-base placeholder:font-sans placeholder:text-tinta-3 focus:border-marca focus:outline-none"
           />
@@ -455,6 +458,7 @@ export function PantallaEscaneo({
         <AltaCilindro
           serie={aDarDeAlta}
           gases={gasesActivos}
+          pesos={pesos}
           alCerrar={() => setADarDeAlta(null)}
           alCrear={(gas) => setGases((xs) => ({ ...xs, [aDarDeAlta]: gas }))}
         />
@@ -605,7 +609,8 @@ function FilaDelLote({
   gas,
   gases,
   alCambiarGas,
-  alCorregirTamano,
+  pesos,
+  alCorregirKilos,
   alDarDeAlta,
   alSacar,
 }: {
@@ -614,18 +619,19 @@ function FilaDelLote({
   gas: string;
   gases: string[];
   alCambiarGas(gas: string): void;
-  alCorregirTamano(tamano: Tamano): Promise<void>;
+  pesos: number[];
+  alCorregirKilos(kg: number): Promise<void>;
   alDarDeAlta(): void;
   alSacar(): void;
 }) {
   const [corrigiendo, setCorrigiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function corregir(tamano: Tamano) {
-    if (corrigiendo || tamano === item.tamano) return;
+  function corregir(kg: number) {
+    if (corrigiendo || kg === item.kg) return;
     setCorrigiendo(true);
     setError(null);
-    alCorregirTamano(tamano)
+    alCorregirKilos(kg)
       .catch((falla: unknown) => setError(falla instanceof Error ? falla.message : 'No se pudo corregir.'))
       .finally(() => setCorrigiendo(false));
   }
@@ -663,24 +669,9 @@ function FilaDelLote({
       )}
 
       {item.conocido && (
-        <div className="mt-2 flex items-center gap-2 pr-3">
-          {/* El tamaño: tocar el otro lo corrige en el cilindro. */}
-          <div className="flex shrink-0 rounded-[12px] border-[1.5px] border-linea-fuerte p-0.5" role="group" aria-label="Tamaño">
-            {(['chico', 'grande'] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => corregir(t)}
-                aria-pressed={item.tamano === t}
-                disabled={corrigiendo}
-                className={`h-10 rounded-[9px] px-3 text-sm font-semibold ${
-                  item.tamano === t ? 'bg-tinta text-white' : 'text-tinta-2'
-                }`}
-              >
-                {t === 'chico' ? 'Chico' : 'Grande'}
-              </button>
-            ))}
-          </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2 pr-3">
+          {/* El peso: tocar otro lo corrige en el cilindro, para siempre. */}
+          <ElegirKilos chico pesos={pesos} valor={item.kg} alCambiar={corregir} deshabilitado={corrigiendo} />
 
           {entrega ? (
             <select

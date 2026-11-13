@@ -73,7 +73,8 @@ export type Base = {
 
   crearUsuario(nombre: string, rol?: 'admin' | 'operador', activo?: boolean): Promise<string>;
   crearCliente(nombre: string): Promise<string>;
-  crearCilindro(serie: string, tamano?: 'chico' | 'grande'): Promise<string>;
+  /** El peso en kilos. 'chico' y 'grande' quedan como atajos: 4 y 7 kg, que conservan su tarifa. */
+  crearCilindro(serie: string, kg?: number | 'chico' | 'grande'): Promise<string>;
 
   /** Deja un arriendo abierto desde hace `dias`, con su movimiento de entrega. */
   entregarHace(serie: string, clienteId: string, dias: number, operadorId: string): Promise<void>;
@@ -143,15 +144,16 @@ export async function crearBase(): Promise<Base> {
       return id;
     },
 
-    async crearCilindro(serie, tamano = 'chico') {
+    async crearCilindro(serie, peso = 'chico') {
+      const kg = peso === 'chico' ? 4 : peso === 'grande' ? 7 : peso;
       const { id } = await uno<{ id: string }>(
-        'insert into public.cilindros (serie, tamano) values ($1, $2) returning id',
-        [serie, tamano],
+        'insert into public.cilindros (serie, kg) values ($1, $2) returning id',
+        [serie, kg],
       );
       await duenio.afectadas(
         `insert into public.tarifas (cilindro_id, tarifa_mensual)
-         select $1, tarifa_mensual from public.tarifas_por_tamano where tamano = $2`,
-        [id, tamano],
+         select $1, tarifa_mensual from public.tarifas_por_kilos where kg = $2`,
+        [id, kg],
       );
       return id;
     },

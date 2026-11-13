@@ -14,7 +14,6 @@ import type {
   Cliente,
   EstadoApp,
   Movimiento,
-  Tamano,
   TipoCliente,
   TipoGas,
   TipoMovimiento,
@@ -45,7 +44,8 @@ export type FilaCilindro = {
   id: string;
   serie: string;
   tipo_gas: string;
-  tamano: Tamano;
+  /** `numeric` puede llegar como número o como texto. */
+  kg: number | string;
   activo: boolean;
 };
 
@@ -106,6 +106,7 @@ export type Filas = {
   avisos?: FilaAviso[];
   textosAviso?: FilaTextosAviso | null;
   tiposGas?: TipoGas[];
+  pesos?: { kg: number | string; activo: boolean }[];
 };
 
 /**
@@ -137,7 +138,7 @@ export function armarEstado(filas: Filas, operador: string): EstadoApp {
     id: c.id,
     serie: c.serie,
     tipoGas: c.tipo_gas,
-    tamano: c.tamano,
+    kg: Number(c.kg),
     // Sin fila de tarifa, `null`: "no la puede ver". Nunca cero.
     tarifaMensual: tarifas.get(c.id) ?? null,
     activo: c.activo,
@@ -201,6 +202,9 @@ export function armarEstado(filas: Filas, operador: string): EstadoApp {
     ...(filas.tiposGas === undefined
       ? {}
       : { tiposGas: [...filas.tiposGas].sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre)) }),
+    ...(filas.pesos === undefined
+      ? {}
+      : { pesos: filas.pesos.map((p) => ({ kg: Number(p.kg), activo: p.activo })).sort((a, b) => a.kg - b.kg) }),
     ...(textos == null ? {} : {
           textosAviso: {
             conCargo: textos.con_cargo,

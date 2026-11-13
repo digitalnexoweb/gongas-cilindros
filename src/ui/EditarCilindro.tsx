@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 
-import { tarifasPorTamano } from '../datos/repositorio';
+import { tarifasPorKilos } from '../datos/repositorio';
 import { formatearPesos } from '../dominio/arriendo';
-import type { Cilindro, Tamano } from '../dominio/tipos';
+import type { Cilindro } from '../dominio/tipos';
 import { useEstado } from '../estado/ProveedorEstado';
+import { ElegirKilos, pesosActivos } from './ElegirKilos';
 import { Encabezado } from './Encabezado';
 import {
   Campo,
@@ -15,7 +16,7 @@ import {
 } from './Formulario';
 
 /**
- * Tamaño, gas, tarifa propia y baja de un cilindro. La serie no se edita: es
+ * Peso, gas, tarifa propia y baja de un cilindro. La serie no se edita: es
  * la que está impresa en la etiqueta. Solo el administrador llega acá.
  */
 export function EditarCilindro({
@@ -31,19 +32,21 @@ export function EditarCilindro({
   const { estado, editarCilindro } = useEstado();
   const gases = (estado.tiposGas ?? []).filter((g) => g.activo).map((g) => g.nombre);
 
-  const [tamano, setTamano] = useState<Tamano>(cilindro.tamano);
+  const pesos = pesosActivos(estado.pesos);
+  const [kg, setKg] = useState(cilindro.kg);
   const [tipoGas, setTipoGas] = useState(cilindro.tipoGas);
   const [tarifa, setTarifa] = useState(cilindro.tarifaMensual === null ? '' : String(cilindro.tarifaMensual));
   const [activo, setActivo] = useState(cilindro.activo);
-  const [porTamano, setPorTamano] = useState<Record<Tamano, number> | null>(null);
+  // La tarifa de cada peso, para proponerla al cambiar de peso.
+  const [porKilos, setPorKilos] = useState<Map<number, number> | null>(null);
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    tarifasPorTamano()
-      .then(setPorTamano)
-      .catch(() => setPorTamano(null));
+    tarifasPorKilos()
+      .then((lista) => setPorKilos(new Map(lista.map((t) => [t.kg, t.tarifa]))))
+      .catch(() => setPorKilos(null));
   }, []);
 
   const monto = leerMonto(tarifa);
@@ -57,7 +60,7 @@ export function EditarCilindro({
 
         setGuardando(true);
         setError(null);
-        editarCilindro(cilindro.id, { tamano, tipoGas: tipoGas.trim(), tarifaMensual: monto, activo })
+        editarCilindro(cilindro.id, { kg, tipoGas: tipoGas.trim(), tarifaMensual: monto, activo })
           .then(alVolver)
           .catch((falla: unknown) => {
             setError(falla instanceof Error ? falla.message : 'No se pudo guardar el cilindro.');
@@ -68,17 +71,15 @@ export function EditarCilindro({
       <Encabezado titulo={`Editar ${cilindro.serie}`} alVolver={alVolver} />
 
       <div className="space-y-5 px-4 pt-4 pb-6">
-        <Opciones<Tamano>
-          etiqueta="Tamaño"
-          opciones={[
-            { valor: 'chico', texto: 'Chico' },
-            { valor: 'grande', texto: 'Grande' },
-          ]}
-          valor={tamano}
+        <ElegirKilos
+          etiqueta="Peso"
+          pesos={pesos}
+          valor={kg}
           alCambiar={(nuevo) => {
-            setTamano(nuevo);
-            // La tarifa se completa con la del tamaño nuevo; se puede ajustar después.
-            if (porTamano !== null && nuevo !== tamano) setTarifa(String(porTamano[nuevo]));
+            setKg(nuevo);
+            // La tarifa se completa con la del peso nuevo; se puede ajustar después.
+            const deEsePeso = porKilos?.get(nuevo);
+            if (deEsePeso !== undefined && nuevo !== kg) setTarifa(String(deEsePeso));
           }}
         />
 
@@ -110,8 +111,8 @@ export function EditarCilindro({
           ayuda={
             tarifa.trim() !== '' && monto === null
               ? 'Escribí solo el número, por ejemplo 480.'
-              : porTamano !== null
-                ? `La de su tamaño es ${formatearPesos(porTamano[tamano])}. Si ponés otra, queda como precio propio de este cilindro.`
+              : porKilos?.get(kg) !== undefined
+                ? `La de ${kg} kg es ${formatearPesos(porKilos.get(kg) ?? 0)}. Si ponés otra, queda como precio propio de este cilindro.`
                 : undefined
           }
         />

@@ -88,7 +88,7 @@ export function PantallaTextoAviso({ alVolver }: { alVolver(): void }) {
           }
           ejemplo={textoDelAviso(textos, {
             cliente: 'ANCAP',
-            serie: 'CIL-00101',
+            serie: '729026',
             fechaEntrega: sumarDias(hoy, -92),
             dias: 92,
             importe: 469,
@@ -107,7 +107,7 @@ export function PantallaTextoAviso({ alVolver }: { alVolver(): void }) {
           }
           ejemplo={textoDelAviso(textos, {
             cliente: 'Taller Pereira',
-            serie: 'CIL-00103',
+            serie: '729033',
             fechaEntrega: sumarDias(hoy, -57),
             dias: 57,
             importe: 0,

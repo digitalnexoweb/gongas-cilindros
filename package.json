@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "funcion:armar": "node scripts/armar-funcion.ts"
+    "funcion:armar": "node scripts/armar-funcion.ts",
+    "etiquetas:verificar": "node scripts/verificar-etiquetas.ts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.16",

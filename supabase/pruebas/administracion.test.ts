@@ -38,10 +38,10 @@ async function tarifaDe(serie: string): Promise<number> {
   return Number(fila?.t);
 }
 
-async function tarifaDeTamano(tamano: string): Promise<number> {
+async function tarifaDeKilos(kg: number): Promise<number> {
   const [fila] = await base.duenio.filas<{ t: string }>(
-    'select tarifa_mensual as t from public.tarifas_por_tamano where tamano = $1',
-    [tamano],
+    'select tarifa_mensual as t from public.tarifas_por_kilos where kg = $1',
+    [kg],
   );
   return Number(fila?.t);
 }
@@ -128,7 +128,7 @@ describe('editar clientes', () => {
 
 // ───────────────────────────────────────────────────────── Tarifas
 
-describe('cambiar_tarifa_por_tamano', () => {
+describe('cambiar_tarifa_de_kilos', () => {
   it('cambia el tamaño y sus cilindros, menos los que tienen precio propio', async () => {
     await base.crearCilindro('CIL-00101', 'grande');
     await base.crearCilindro('CIL-00102', 'grande');
@@ -140,28 +140,28 @@ describe('cambiar_tarifa_por_tamano', () => {
     );
 
     const [resultado] = await base.como(joaquin, (s) =>
-      s.filas<{ cambiados: number }>("select public.cambiar_tarifa_por_tamano('grande', 480) as cambiados"),
+      s.filas<{ cambiados: number }>('select public.cambiar_tarifa_de_kilos(7, 480) as cambiados'),
     );
 
     expect(resultado?.cambiados).toBe(1);
-    expect(await tarifaDeTamano('grande')).toBe(480);
+    expect(await tarifaDeKilos(7)).toBe(480);
     expect(await tarifaDe('CIL-00101')).toBe(480);
     expect(await tarifaDe('CIL-00102')).toBe(500);
     expect(await tarifaDe('CIL-00103')).toBe(380);
   });
 
   it('un cilindro nuevo nace con el precio nuevo', async () => {
-    await base.como(joaquin, (s) => s.filas("select public.alta_cilindro('CIL-00104', 'grande')"));
+    await base.como(joaquin, (s) => s.filas("select public.alta_cilindro('CIL-00104', 7)"));
     expect(await tarifaDe('CIL-00104')).toBe(480);
   });
 
   it('rechaza un precio negativo y un tamaño que no existe', async () => {
     await expect(
-      base.como(joaquin, (s) => s.filas("select public.cambiar_tarifa_por_tamano('grande', -1)")),
+      base.como(joaquin, (s) => s.filas('select public.cambiar_tarifa_de_kilos(7, -1)')),
     ).rejects.toThrow(/mayor o igual a cero/);
     await expect(
-      base.como(joaquin, (s) => s.filas("select public.cambiar_tarifa_por_tamano('mediano', 400)")),
-    ).rejects.toThrow(/Tamaño inválido/);
+      base.como(joaquin, (s) => s.filas('select public.cambiar_tarifa_de_kilos(5, 400)')),
+    ).rejects.toThrow(/no está en la lista/);
   });
 
   it.each([
@@ -169,27 +169,27 @@ describe('cambiar_tarifa_por_tamano', () => {
     ['un usuario desactivado', () => desactivado],
   ])('%s no puede cambiar precios', async (_quien, id) => {
     await expect(
-      base.como(id(), (s) => s.filas("select public.cambiar_tarifa_por_tamano('chico', 1)")),
+      base.como(id(), (s) => s.filas('select public.cambiar_tarifa_de_kilos(4, 1)')),
     ).rejects.toThrow(/No autorizado/);
-    expect(await tarifaDeTamano('chico')).toBe(380);
+    expect(await tarifaDeKilos(4)).toBe(380);
   });
 });
 
 // ───────────────────────────────────────────────────────── Cilindros
 
 describe('editar_cilindro', () => {
-  it('cambia tamaño, gas y tarifa juntos', async () => {
+  it('cambia peso, gas y tarifa juntos', async () => {
     const id = await base.crearCilindro('CIL-00201', 'chico');
 
     await base.como(joaquin, (s) =>
-      s.filas("select public.editar_cilindro($1, 'grande', 'oxígeno', 450, true)", [id]),
+      s.filas("select public.editar_cilindro($1, 7, 'oxígeno', 450, true)", [id]),
     );
 
-    const [cilindro] = await base.duenio.filas<{ tamano: string; tipo_gas: string; serie: string }>(
-      'select tamano, tipo_gas, serie from public.cilindros where id = $1',
+    const [cilindro] = await base.duenio.filas<{ kg: number; tipo_gas: string; serie: string }>(
+      'select kg::float8 as kg, tipo_gas, serie from public.cilindros where id = $1',
       [id],
     );
-    expect(cilindro).toEqual({ tamano: 'grande', tipo_gas: 'oxígeno', serie: 'CIL-00201' });
+    expect(cilindro).toEqual({ kg: 7, tipo_gas: 'oxígeno', serie: 'CIL-00201' });
     expect(await tarifaDe('CIL-00201')).toBe(450);
   });
 
@@ -197,7 +197,7 @@ describe('editar_cilindro', () => {
     const id = await base.crearCilindro('CIL-00202', 'chico');
 
     await base.como(joaquin, (s) =>
-      s.filas("select public.editar_cilindro($1, 'chico', 'acetileno', 380, false)", [id]),
+      s.filas("select public.editar_cilindro($1, 4, 'acetileno', 380, false)", [id]),
     );
 
     const [cilindro] = await base.duenio.filas<{ activo: boolean }>(
@@ -213,7 +213,7 @@ describe('editar_cilindro', () => {
 
     await expect(
       base.como(joaquin, (s) =>
-        s.filas("select public.editar_cilindro($1, 'grande', 'acetileno', 999, false)", [id]),
+        s.filas("select public.editar_cilindro($1, 7, 'acetileno', 999, false)", [id]),
       ),
     ).rejects.toThrow(/Primero hay que recibirlo/);
 
@@ -225,7 +225,7 @@ describe('editar_cilindro', () => {
 
     await expect(
       base.como(empleado, (s) =>
-        s.filas("select public.editar_cilindro($1, 'grande', 'acetileno', 0, true)", [id]),
+        s.filas("select public.editar_cilindro($1, 7, 'acetileno', 0, true)", [id]),
       ),
     ).rejects.toThrow(/No autorizado/);
     expect(await tarifaDe('CIL-00204')).toBe(380);
@@ -236,7 +236,7 @@ describe('editar_cilindro', () => {
 
     await expect(
       base.como(joaquin, (s) =>
-        s.filas("select public.editar_cilindro($1, 'chico', 'acetileno', -5, true)", [id]),
+        s.filas("select public.editar_cilindro($1, 4, 'acetileno', -5, true)", [id]),
       ),
     ).rejects.toThrow(/mayor o igual a cero/);
   });

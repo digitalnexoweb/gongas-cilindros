@@ -140,12 +140,12 @@ describe('confirmar_lote con gas', () => {
   });
 });
 
-describe('corregir_tamano', () => {
-  it('el operario corrige el tamaño, y la tarifa pasa a la del tamaño nuevo', async () => {
+describe('corregir_kilos', () => {
+  it('el operario corrige el peso, y la tarifa pasa a la del peso nuevo', async () => {
     await base.crearCilindro('CIL-00301', 'chico');
 
     const [r] = await base.como(operario, (s) =>
-      s.filas<{ ok: boolean }>("select public.corregir_tamano('cil-00301', 'grande') as ok"),
+      s.filas<{ ok: boolean }>("select public.corregir_kilos('cil-00301', 7) as ok"),
     );
 
     expect(r?.ok).toBe(true);
@@ -158,39 +158,58 @@ describe('corregir_tamano', () => {
       "update public.tarifas set tarifa_mensual = 999 where cilindro_id = (select id from public.cilindros where serie = 'CIL-00302')",
     );
 
-    await base.como(operario, (s) => s.filas("select public.corregir_tamano('CIL-00302', 'grande')"));
+    await base.como(operario, (s) => s.filas("select public.corregir_kilos('CIL-00302', 7)"));
 
     expect(await tarifaDe('CIL-00302')).toBe(999);
   });
 
-  it('si ya tenía ese tamaño, no hace nada', async () => {
+  it('si ya tenía ese peso, no hace nada', async () => {
     const [r] = await base.como(operario, (s) =>
-      s.filas<{ ok: boolean }>("select public.corregir_tamano('CIL-00301', 'grande') as ok"),
+      s.filas<{ ok: boolean }>("select public.corregir_kilos('CIL-00301', 7) as ok"),
     );
     expect(r?.ok).toBe(false);
   });
 
   it('sin sesión no se puede', async () => {
     await expect(
-      base.como(null, (s) => s.filas("select public.corregir_tamano('CIL-00301', 'chico')")),
+      base.como(null, (s) => s.filas("select public.corregir_kilos('CIL-00301', 4)")),
     ).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe('pesos', () => {
+  it('Joaquín agrega un peso con su tarifa, y se puede dar de alta un cilindro con él', async () => {
+    await base.como(joaquin, (s) => s.filas('select public.agregar_kilos(10, 520)'));
+    await base.como(operario, (s) => s.filas("select public.alta_cilindro('CIL-00501', 10)"));
+    expect(await tarifaDe('CIL-00501')).toBe(520);
+  });
+
+  it('no deja agregar un peso repetido, ni al operario agregar ninguno', async () => {
+    await expect(base.como(joaquin, (s) => s.filas('select public.agregar_kilos(4, 1)'))).rejects.toThrow(/ya está/);
+    await expect(base.como(operario, (s) => s.filas('select public.agregar_kilos(12, 1)'))).rejects.toThrow(/No autorizado/);
+  });
+
+  it('corregir a un peso que no está en la lista no se puede', async () => {
+    await expect(
+      base.como(operario, (s) => s.filas("select public.corregir_kilos('CIL-00301', 3)")),
+    ).rejects.toThrow(/no está en la lista/);
   });
 });
 
 describe('alta_cilindro con gas', () => {
   it('guarda el gas elegido, con el nombre de la lista', async () => {
-    await base.como(operario, (s) => s.filas("select public.alta_cilindro('CIL-00401', 'chico', 'nitrógeno')"));
+    await base.como(operario, (s) => s.filas("select public.alta_cilindro('CIL-00401', 4, 'nitrógeno')"));
     expect((await gasDe('CIL-00401')).cilindro).toBe('Nitrógeno');
   });
 
   it('sin gas, Acetileno', async () => {
-    await base.como(operario, (s) => s.filas("select public.alta_cilindro('CIL-00402', 'chico')"));
+    await base.como(operario, (s) => s.filas("select public.alta_cilindro('CIL-00402', 4)"));
     expect((await gasDe('CIL-00402')).cilindro).toBe('Acetileno');
   });
 
   it('rechaza un gas que no está en la lista', async () => {
     await expect(
-      base.como(operario, (s) => s.filas("select public.alta_cilindro('CIL-00403', 'chico', 'Kriptonita')")),
+      base.como(operario, (s) => s.filas("select public.alta_cilindro('CIL-00403', 4, 'Kriptonita')")),
     ).rejects.toThrow(/no está en la lista/);
   });
 });

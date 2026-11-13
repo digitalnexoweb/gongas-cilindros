@@ -1,44 +1,47 @@
 import { useState } from 'react';
 
-import type { Tamano } from '../../dominio/tipos';
 import { useEstado } from '../../estado/ProveedorEstado';
-import { ErrorDeFormulario, Opciones, claseBotonPrincipal, claseBotonSecundario } from '../Formulario';
+import { ElegirKilos } from '../ElegirKilos';
+import { ErrorDeFormulario, claseBotonPrincipal, claseBotonSecundario } from '../Formulario';
 
 /**
  * "Serie desconocida: ofrece darla de alta en el momento", de la sección 6.1.
- * Lo mínimo para seguir escaneando: el tamaño y el gas con el que sale.
+ * Lo mínimo para seguir escaneando: el peso y el gas con el que sale.
  *
- * El tamaño queda para siempre en el cilindro: de ahí en más, cada vez que se
- * escanee esa etiqueta ya figura como grande o chico. La tarifa no se muestra
- * ni se elige acá: la pone la base según el tamaño, y quien da de alta el
- * cilindro puede ser un operario, que no ve tarifas.
+ * El peso queda para siempre en el cilindro: de ahí en más, cada vez que se
+ * escanee esa etiqueta ya figura con sus kilos. La tarifa no se muestra ni se
+ * elige acá: la pone la base según el peso, y quien da de alta el cilindro
+ * puede ser un operario, que no ve tarifas.
  */
 export function AltaCilindro({
   serie,
   gases,
+  pesos,
   alCerrar,
   alCrear,
 }: {
   serie: string;
   /** Los gases que se pueden elegir, en orden. */
   gases: string[];
+  /** Los pesos que se pueden elegir, de menor a mayor. */
+  pesos: number[];
   alCerrar(): void;
   /** Con el gas elegido, para que la fila del lote lo muestre ya puesto. */
   alCrear(gas: string): void;
 }) {
   const { altaCilindro } = useEstado();
 
-  const [tamano, setTamano] = useState<Tamano>('chico');
+  const [kg, setKg] = useState<number | null>(null);
   const [gas, setGas] = useState(gases[0] ?? 'Acetileno');
   const [creando, setCreando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function darDeAlta() {
-    if (creando) return;
+    if (creando || kg === null) return;
 
     setCreando(true);
     setError(null);
-    altaCilindro(serie, tamano, gas)
+    altaCilindro(serie, kg, gas)
       .then(() => {
         alCrear(gas);
         alCerrar();
@@ -60,19 +63,12 @@ export function AltaCilindro({
             Dar de alta <span className="font-mono">{serie}</span>
           </h2>
           <p className="mt-1 text-sm text-tinta-2">
-            No está en el sistema. El tamaño queda guardado en la etiqueta para las próximas veces.
+            No está en el sistema. Elegí su peso: queda guardado para las próximas veces.
           </p>
         </div>
 
-        <Opciones<Tamano>
-          etiqueta="Tamaño"
-          opciones={[
-            { valor: 'chico', texto: 'Chico' },
-            { valor: 'grande', texto: 'Grande' },
-          ]}
-          valor={tamano}
-          alCambiar={setTamano}
-        />
+        {/* Sin peso preelegido a propósito: que se mire el cilindro antes de tocar. */}
+        <ElegirKilos etiqueta="Peso" pesos={pesos} valor={kg} alCambiar={setKg} />
 
         <label className="block">
           <span className="block text-sm font-medium text-tinta-2">Gas</span>
@@ -95,7 +91,7 @@ export function AltaCilindro({
           <button type="button" onClick={alCerrar} className={claseBotonSecundario}>
             Cancelar
           </button>
-          <button type="button" onClick={darDeAlta} disabled={creando} className={claseBotonPrincipal}>
+          <button type="button" onClick={darDeAlta} disabled={creando || kg === null} className={claseBotonPrincipal}>
             {creando ? 'Creando…' : 'Dar de alta'}
           </button>
         </div>

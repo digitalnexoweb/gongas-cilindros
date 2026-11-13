@@ -14,9 +14,9 @@ function filasDeJoaquin(): Filas {
       { id: 'k-pereira', nombre: 'Taller Pereira', tipo: 'particular', documento: '41234567', telefono: '' },
     ],
     cilindros: [
-      { id: 'c-1', serie: 'CIL-00001', tipo_gas: 'acetileno', tamano: 'grande', activo: true },
-      { id: 'c-2', serie: 'CIL-00002', tipo_gas: 'acetileno', tamano: 'chico', activo: true },
-      { id: 'c-3', serie: 'CIL-00003', tipo_gas: 'acetileno', tamano: 'chico', activo: true },
+      { id: 'c-1', serie: 'CIL-00001', tipo_gas: 'acetileno', kg: 7, activo: true },
+      { id: 'c-2', serie: 'CIL-00002', tipo_gas: 'acetileno', kg: '4.0', activo: true },
+      { id: 'c-3', serie: 'CIL-00003', tipo_gas: 'acetileno', kg: '4.0', activo: true },
     ],
     tarifas: [
       { cilindro_id: 'c-1', tarifa_mensual: 440 },
@@ -51,7 +51,7 @@ describe('armarEstado', () => {
       id: 'c-1',
       serie: 'CIL-00001',
       tipoGas: 'acetileno',
-      tamano: 'grande',
+      kg: 7,
       tarifaMensual: 440,
       activo: true,
     });

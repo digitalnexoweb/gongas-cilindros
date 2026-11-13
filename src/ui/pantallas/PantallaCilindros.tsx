@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 
 import { vistaCilindros, type VistaCilindro } from '../../dominio/consultas';
 import { useEstado } from '../../estado/ProveedorEstado';
+import { nombreKilos } from '../../dominio/tipos';
 import { Buscador } from '../Buscador';
 import { ChipEstado, estadoVisible, type EstadoVisible } from '../ChipEstado';
 import { Encabezado } from '../Encabezado';
@@ -16,8 +17,6 @@ const filtros: { id: Filtro; etiqueta: string }[] = [
   { id: 'por_vencer', etiqueta: 'Por vencer' },
   { id: 'generando_cargo', etiqueta: 'Generando cargo' },
 ];
-
-export const nombreTamano = { chico: 'Chico', grande: 'Grande' } as const;
 
 /** La sección 6.2: lista de todos los cilindros, con filtros y buscador por serie. */
 export function PantallaCilindros({ alAbrir }: { alAbrir(cilindroId: string): void }) {
@@ -97,8 +96,8 @@ function FilaCilindro({
   const donde = ubicacion.lugar === 'cliente' ? `En ${ubicacion.cliente.nombre}` : 'En stock';
   const detalle =
     calculo === null
-      ? `${nombreTamano[cilindro.tamano]} · ${donde}`
-      : `${nombreTamano[cilindro.tamano]} · ${donde} · ${calculo.dias} días`;
+      ? `${nombreKilos(cilindro.kg)} · ${donde}`
+      : `${nombreKilos(cilindro.kg)} · ${donde} · ${calculo.dias} días`;
 
   return (
     <button

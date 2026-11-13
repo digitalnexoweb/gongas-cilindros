@@ -4,7 +4,7 @@ import type { LoteConfirmado } from '../../datos/repositorio';
 import { DIAS_GRACIA, formatearFecha } from '../../dominio/arriendo';
 import { cilindroPorSerie } from '../../dominio/consultas';
 import { linkWhatsApp, textoComprobante } from '../../dominio/mensajes';
-import type { Cliente, TipoMovimiento } from '../../dominio/tipos';
+import { nombreKilos, type Cliente, type TipoMovimiento } from '../../dominio/tipos';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { Alerta, Reloj, Tilde, WhatsApp } from '../iconos';
 
@@ -110,7 +110,7 @@ export function Comprobante({
                   <span className="font-mono text-[17px] font-bold">{serie}</span>
                   {cilindro !== null && (
                     <span className="text-sm text-tinta-2">
-                      {cilindro.tamano === 'grande' ? 'Grande' : 'Chico'} · {(lote.gases[i] ?? cilindro.tipoGas).toLowerCase()}
+                      {nombreKilos(cilindro.kg)} · {(lote.gases[i] ?? cilindro.tipoGas).toLowerCase()}
                     </span>
                   )}
                 </li>

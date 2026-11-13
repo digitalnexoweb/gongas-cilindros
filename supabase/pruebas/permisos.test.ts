@@ -34,7 +34,7 @@ afterAll(async () => {
 });
 
 const TABLAS_DE_TRABAJO = ['clientes', 'cilindros', 'arriendos', 'movimientos'];
-const TABLAS_DE_PLATA = ['tarifas', 'tarifas_por_tamano'];
+const TABLAS_DE_PLATA = ['tarifas', 'tarifas_por_kilos'];
 
 // ───────────────────────────────────────────────────────── Sin sesión
 
@@ -58,7 +58,7 @@ describe('sin sesión', () => {
 
   it('no puede dar de alta un cilindro', async () => {
     await expect(
-      base.como(null, (s) => s.filas("select public.alta_cilindro('CIL-09999', 'chico')")),
+      base.como(null, (s) => s.filas("select public.alta_cilindro('CIL-09999', 4)")),
     ).rejects.toThrow(/permission denied/);
   });
 });
@@ -160,16 +160,26 @@ describe('Joaquín, el administrador', () => {
     expect(tarifas.map((t) => Number(t.tarifa_mensual))).toEqual([440]);
   });
 
-  it('ve las tarifas por tamaño: 380 chico y 440 grande', async () => {
+  it('ve las tarifas por peso: 380 para 2 y 4 kg, 440 para 6 y 7 kg', async () => {
     const tarifas = await base.como(joaquin, (s) =>
-      s.filas<{ tamano: string; tarifa_mensual: string }>(
-        'select tamano, tarifa_mensual from public.tarifas_por_tamano order by tamano',
+      s.filas<{ kg: string; tarifa_mensual: string }>(
+        'select kg, tarifa_mensual from public.tarifas_por_kilos order by kg',
       ),
     );
-    expect(tarifas.map((t) => [t.tamano, Number(t.tarifa_mensual)])).toEqual([
-      ['chico', 380],
-      ['grande', 440],
+    expect(tarifas.map((t) => [Number(t.kg), Number(t.tarifa_mensual)])).toEqual([
+      [2, 380],
+      [4, 380],
+      [6, 440],
+      [7, 440],
     ]);
+  });
+
+  it('el operario ve los pesos para elegir, pero no sus tarifas', async () => {
+    const pesos = await base.como(empleado, (s) =>
+      s.filas<{ kg: string }>('select kg from public.tamanos order by kg'),
+    );
+    expect(pesos.map((p) => Number(p.kg))).toEqual([2, 4, 6, 7]);
+    expect(await base.como(empleado, (s) => s.filas('select * from public.tarifas_por_kilos'))).toEqual([]);
   });
 
   it('puede corregir los datos de un cliente', async () => {

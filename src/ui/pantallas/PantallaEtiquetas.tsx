@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useEstado } from '../../estado/ProveedorEstado';
+import { nombreKilos } from '../../dominio/tipos';
 import {
   ALTO_ETIQUETA_MM,
   ANCHO_ETIQUETA_MM,
@@ -123,7 +124,7 @@ export function PantallaEtiquetas({ alVolver }: { alVolver(): void }) {
                 />
                 <span className="font-mono text-base">{cilindro.serie}</span>
                 <span className="ml-auto text-sm text-slate-500">
-                  {cilindro.tamano === 'chico' ? 'Chico' : 'Grande'}
+                  {nombreKilos(cilindro.kg)}
                 </span>
               </label>
             </li>

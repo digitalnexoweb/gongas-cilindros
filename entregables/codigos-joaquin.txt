@@ -1,0 +1,18 @@
+# Los cilindros de GONGAS, con el código que traen. Joaquín, 13/11/2026.
+# Uno por línea. El peso de cada uno está cargado en la app.
+762
+104409
+730024
+729026
+729033
+729035
+729034
+729053
+729005
+729032
+729025
+729027
+729043
+729017
+729047
+729012

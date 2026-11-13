@@ -18,7 +18,7 @@ import { EditarCilindro } from '../EditarCilindro';
 import { Encabezado } from '../Encabezado';
 import { cuandoEnFrase } from '../hora';
 import { Importe } from '../Importe';
-import { nombreTamano } from './PantallaCilindros';
+import { nombreKilos } from '../../dominio/tipos';
 
 /** La sección 6.2: la ficha, con el historial completo de movimientos. */
 export function FichaCilindro({
@@ -109,7 +109,7 @@ export function FichaCilindro({
             <span className="font-mono">{cilindro.serie}</span>
           </Dato>
           <Dato etiqueta="Último gas">{cilindro.tipoGas}</Dato>
-          <Dato etiqueta="Tamaño">{nombreTamano[cilindro.tamano]}</Dato>
+          <Dato etiqueta="Peso">{nombreKilos(cilindro.kg)}</Dato>
           {/*
             La diaria va con decimales a propósito: el SPEC dice que no se
             redondea. Mostrar "$ 13" invitaría a la cuenta equivocada, porque

@@ -140,7 +140,7 @@ describe('paridad entre confirmarLote (TypeScript) y confirmar_lote (SQL)', () =
             id: idCilindro[serie]!,
             serie,
             tipoGas: 'acetileno',
-            tamano: 'grande',
+            kg: 7,
             tarifaMensual: 440,
             activo: true,
           })),

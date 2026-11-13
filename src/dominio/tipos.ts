@@ -9,21 +9,33 @@
 
 import type { FechaISO } from './arriendo';
 
-export type Tamano = 'chico' | 'grande';
+/**
+ * Tarifa mensual de arranque de cada peso, en kilos. La base tiene la suya
+ * (tarifas_por_kilos), que el administrador cambia; esta la usa la demo.
+ * Cada cilindro puede tener un precio propio.
+ */
+export const TARIFA_POR_KILOS_DEMO: Record<number, number> = { 2: 380, 4: 380, 6: 440, 7: 440 };
 
-/** Tarifa mensual por defecto de cada tamaño. Cada cilindro la puede pisar. */
-export const TARIFA_POR_TAMANO: Record<Tamano, number> = {
-  chico: 380,
-  grande: 440,
+/** Un peso de cilindro que se puede elegir. */
+export type Peso = {
+  kg: number;
+  /** Uno que ya se usó no se borra: se deja de ofrecer. */
+  activo: boolean;
 };
+
+/** "4 kg", "2,5 kg". */
+export function nombreKilos(kg: number): string {
+  return `${String(kg).replace('.', ',')} kg`;
+}
 
 export type Cilindro = {
   id: string;
   /** Única, va en el QR. Ej: "CIL-00123". */
   serie: string;
-  /** "acetileno" en el prototipo. */
+  /** El último gas con el que salió. En cada entrega se elige. */
   tipoGas: string;
-  tamano: Tamano;
+  /** El peso del cilindro, en kilos: 2, 4, 6, 7… */
+  kg: number;
   /**
    * `null` significa "este usuario no la puede ver": a un empleado la base no
    * le entrega las tarifas. No es cero, y nada tiene que mostrarlo como cero.
@@ -134,6 +146,8 @@ export type EstadoApp = {
   textosAviso?: TextosAviso;
   /** Los gases que se pueden elegir al entregar. Solo vienen de la base. */
   tiposGas?: TipoGas[];
+  /** Los pesos que se pueden elegir. Solo vienen de la base. */
+  pesos?: Peso[];
 };
 
 export type TipoGas = {

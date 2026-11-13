@@ -9,7 +9,7 @@
 
 import type { FechaISO } from '../dominio/arriendo';
 import { armarAviso, type AvisoLote, type TipoAviso } from '../dominio/storage';
-import type { Cliente, EstadoApp, Tamano, TextosAviso, TipoGas, TipoMovimiento } from '../dominio/tipos';
+import type { Cliente, EstadoApp, TextosAviso, TipoGas, TipoMovimiento } from '../dominio/tipos';
 import {
   armarEstado,
   type FilaArriendo,
@@ -141,9 +141,9 @@ async function traerTodo<T>(tabla: string, columnas: string, orden: string[]): P
 
 /** La foto completa del estado, tal como la base se la entrega a este usuario. */
 export async function cargarEstado(perfil: Perfil): Promise<EstadoApp> {
-  const [clientes, cilindros, tarifas, arriendos, movimientos, avisos, textos, tiposGas] = await Promise.all([
+  const [clientes, cilindros, tarifas, arriendos, movimientos, avisos, textos, tiposGas, pesos] = await Promise.all([
     traerTodo<FilaCliente>('clientes', 'id, nombre, tipo, documento, telefono, email, direccion, ciudad, notas', ['nombre', 'id']),
-    traerTodo<FilaCilindro>('cilindros', 'id, serie, tipo_gas, tamano, activo', ['serie']),
+    traerTodo<FilaCilindro>('cilindros', 'id, serie, tipo_gas, kg, activo', ['serie']),
     // A un empleado esto le vuelve vacío: la base no le entrega tarifas.
     traerTodo<FilaTarifa>('tarifas', 'cilindro_id, tarifa_mensual', ['cilindro_id']),
     traerTodo<FilaArriendo>(
@@ -163,6 +163,7 @@ export async function cargarEstado(perfil: Perfil): Promise<EstadoApp> {
     ),
     supabase.from('textos_aviso').select('con_cargo, por_vencer, copia_mail').maybeSingle(),
     traerTodo<TipoGas>('tipos_gas', 'nombre, activo, orden', ['orden', 'nombre']),
+    traerTodo<{ kg: number | string; activo: boolean }>('tamanos', 'kg, activo', ['kg']),
   ]);
 
   if (textos.error !== null) throw falla(textos.error);
@@ -177,6 +178,7 @@ export async function cargarEstado(perfil: Perfil): Promise<EstadoApp> {
       avisos,
       textosAviso: textos.data as FilaTextosAviso | null,
       tiposGas,
+      pesos,
     },
     perfil.nombre,
   );
@@ -265,21 +267,21 @@ export async function altaCliente(datos: Omit<Cliente, 'id'>): Promise<string> {
 }
 
 /** Da de alta un cilindro. La tarifa la pone la base según el tamaño. */
-export async function altaCilindro(serie: string, tamano: Tamano, tipoGas?: string): Promise<void> {
+export async function altaCilindro(serie: string, kg: number, tipoGas?: string): Promise<void> {
   const { error } = await supabase.rpc('alta_cilindro', {
     p_serie: serie,
-    p_tamano: tamano,
+    p_kg: kg,
     ...(tipoGas === undefined ? {} : { p_tipo_gas: tipoGas }),
   });
   if (error !== null) throw falla(error);
 }
 
 /**
- * Corrige el tamaño de un cilindro. Cualquier usuario activo: es un dato
- * físico. La tarifa pasa a la del tamaño nuevo salvo que tuviera un precio propio.
+ * Corrige el peso de un cilindro. Cualquier usuario activo: es un dato
+ * físico. La tarifa pasa a la del peso nuevo salvo que tuviera un precio propio.
  */
-export async function corregirTamano(serie: string, tamano: Tamano): Promise<void> {
-  const { error } = await supabase.rpc('corregir_tamano', { p_serie: serie, p_tamano: tamano });
+export async function corregirKilos(serie: string, kg: number): Promise<void> {
+  const { error } = await supabase.rpc('corregir_kilos', { p_serie: serie, p_kg: kg });
   if (error !== null) throw falla(error);
 }
 
@@ -345,7 +347,7 @@ export async function editarCliente(id: string, datos: Omit<Cliente, 'id'>): Pro
 }
 
 export type CambiosCilindro = {
-  tamano: Tamano;
+  kg: number;
   tipoGas: string;
   tarifaMensual: number;
   activo: boolean;
@@ -355,7 +357,7 @@ export type CambiosCilindro = {
 export async function editarCilindro(id: string, cambios: CambiosCilindro): Promise<void> {
   const { error } = await supabase.rpc('editar_cilindro', {
     p_id: id,
-    p_tamano: cambios.tamano,
+    p_kg: cambios.kg,
     p_tipo_gas: cambios.tipoGas,
     p_tarifa: cambios.tarifaMensual,
     p_activo: cambios.activo,
@@ -363,30 +365,30 @@ export async function editarCilindro(id: string, cambios: CambiosCilindro): Prom
   if (error !== null) throw falla(error);
 }
 
-/** El precio por defecto de cada tamaño, con el que nace un cilindro nuevo. */
-export async function tarifasPorTamano(): Promise<Record<Tamano, number>> {
-  const { data, error } = await supabase.from('tarifas_por_tamano').select('tamano, tarifa_mensual');
+/** La tarifa de cada peso, con la que nace un cilindro nuevo. Solo el administrador. */
+export async function tarifasPorKilos(): Promise<{ kg: number; tarifa: number }[]> {
+  const { data, error } = await supabase.from('tarifas_por_kilos').select('kg, tarifa_mensual').order('kg');
   if (error !== null) throw falla(error);
 
-  const filas = (data ?? []) as { tamano: Tamano; tarifa_mensual: number | string }[];
-  const chico = filas.find((f) => f.tamano === 'chico');
-  const grande = filas.find((f) => f.tamano === 'grande');
-  if (chico === undefined || grande === undefined) throw new Error('No tenés permiso para ver las tarifas.');
-
-  return { chico: Number(chico.tarifa_mensual), grande: Number(grande.tarifa_mensual) };
+  const filas = (data ?? []) as { kg: number | string; tarifa_mensual: number | string }[];
+  if (filas.length === 0) throw new Error('No tenés permiso para ver las tarifas.');
+  return filas.map((f) => ({ kg: Number(f.kg), tarifa: Number(f.tarifa_mensual) }));
 }
 
 /**
- * Cambia el precio de un tamaño y el de cada cilindro que tenía el precio viejo.
+ * Cambia la tarifa de un peso y la de cada cilindro que tenía la anterior.
  * Devuelve cuántos cilindros cambiaron.
  */
-export async function cambiarTarifaPorTamano(tamano: Tamano, tarifa: number): Promise<number> {
-  const { data, error } = await supabase.rpc('cambiar_tarifa_por_tamano', {
-    p_tamano: tamano,
-    p_tarifa: tarifa,
-  });
+export async function cambiarTarifaDeKilos(kg: number, tarifa: number): Promise<number> {
+  const { data, error } = await supabase.rpc('cambiar_tarifa_de_kilos', { p_kg: kg, p_tarifa: tarifa });
   if (error !== null) throw falla(error);
   return data as number;
+}
+
+/** Un peso nuevo con su tarifa. Solo el administrador. */
+export async function agregarKilos(kg: number, tarifa: number): Promise<void> {
+  const { error } = await supabase.rpc('agregar_kilos', { p_kg: kg, p_tarifa: tarifa });
+  if (error !== null) throw falla(error);
 }
 
 // ───────────────────────────────────────────────────────── Avisos

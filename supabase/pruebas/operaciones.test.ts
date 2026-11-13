@@ -205,7 +205,7 @@ describe('confirmar_lote', () => {
         "insert into public.clientes (nombre, tipo) values ('Cliente de Joaquín', 'empresa') returning id",
       ),
     );
-    await base.como(joaquin, (s) => s.filas("select public.alta_cilindro('JOA-00001', 'chico')"));
+    await base.como(joaquin, (s) => s.filas("select public.alta_cilindro('JOA-00001', 4)"));
 
     const lote = await confirmar(joaquin, 'entrega', ['JOA-00001'], cliente!.id);
 
@@ -345,13 +345,17 @@ describe('lo que confirmar_lote rechaza entero', () => {
 // ───────────────────────────────────────────────────────── Alta de cilindro
 
 describe('alta_cilindro', () => {
-  function alta(usuario: string, serie: string, tamano: string) {
-    return base.como(usuario, (s) =>
-      s.filas<{ serie: string; tamano: string; activo: boolean }>(
-        'select serie, tamano, activo from public.alta_cilindro($1, $2)',
-        [serie, tamano],
-      ),
-    );
+  // 'chico' y 'grande' son atajos de 4 y 7 kg, que conservan las tarifas de 380 y 440.
+  function alta(usuario: string, serie: string, peso: number | 'chico' | 'grande') {
+    const kg = peso === 'chico' ? 4 : peso === 'grande' ? 7 : peso;
+    return base
+      .como(usuario, (s) =>
+        s.filas<{ serie: string; kg: string; activo: boolean }>(
+          'select serie, kg, activo from public.alta_cilindro($1, $2)',
+          [serie, kg],
+        ),
+      )
+      .then((filas) => filas.map((f) => ({ ...f, kg: Number(f.kg) })));
   }
 
   function tarifaDe(serie: string) {
@@ -365,10 +369,10 @@ describe('alta_cilindro', () => {
   it('un empleado da de alta un cilindro al escanearlo', async () => {
     const [cilindro] = await alta(ana, 'ALTA-00001', 'grande');
 
-    expect(cilindro).toEqual({ serie: 'ALTA-00001', tamano: 'grande', activo: true });
+    expect(cilindro).toEqual({ serie: 'ALTA-00001', kg: 7, activo: true });
   });
 
-  it('la tarifa la pone la base según el tamaño: 440 grande, 380 chico', async () => {
+  it('la tarifa la pone la base según el peso: 440 a 7 kg, 380 a 4 kg', async () => {
     await alta(ana, 'ALTA-00002', 'grande');
     await alta(ana, 'ALTA-00003', 'chico');
 
@@ -383,9 +387,9 @@ describe('alta_cilindro', () => {
     expect(tarifas).toEqual([]);
   });
 
-  it('si cambia la tarifa por tamaño, los cilindros nuevos nacen con la nueva', async () => {
+  it('si cambia la tarifa de un peso, los cilindros nuevos nacen con la nueva', async () => {
     await base.como(joaquin, (s) =>
-      s.afectadas("update public.tarifas_por_tamano set tarifa_mensual = 500 where tamano = 'grande'"),
+      s.afectadas('update public.tarifas_por_kilos set tarifa_mensual = 500 where kg = 7'),
     );
 
     await alta(ana, 'ALTA-00005', 'grande');
@@ -394,7 +398,7 @@ describe('alta_cilindro', () => {
     expect(Number((await tarifaDe('ALTA-00002'))[0]?.tarifa_mensual)).toBe(440);
 
     await base.como(joaquin, (s) =>
-      s.afectadas("update public.tarifas_por_tamano set tarifa_mensual = 440 where tamano = 'grande'"),
+      s.afectadas('update public.tarifas_por_kilos set tarifa_mensual = 440 where kg = 7'),
     );
   });
 
@@ -408,8 +412,8 @@ describe('alta_cilindro', () => {
     await expect(alta(beto, 'ALTA-00007', 'chico')).rejects.toThrow(/ya existe/);
   });
 
-  it('rechaza un tamaño que no existe', async () => {
-    await expect(alta(ana, 'ALTA-00008', 'mediano')).rejects.toThrow(/Tamaño inválido/);
+  it('rechaza un peso que no está en la lista', async () => {
+    await expect(alta(ana, 'ALTA-00008', 5)).rejects.toThrow(/no está en la lista/);
   });
 
   it('rechaza una serie que no parece una serie', async () => {
