@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import { formatearFecha } from '../../dominio/arriendo';
-import { vistaClientes } from '../../dominio/consultas';
+import { ultimoMovimientoDe, vistaClientes } from '../../dominio/consultas';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { ChipEstado, estadoVisible } from '../ChipEstado';
 import { Bloque, Dato } from '../Dato';
@@ -11,6 +11,7 @@ import { FormularioCliente } from '../FormularioCliente';
 import { Importe } from '../Importe';
 import { nombreKilos } from '../../dominio/tipos';
 import { nombreTipoCliente } from './PantallaClientes';
+import { DeshacerLote } from '../escaneo/DeshacerLote';
 
 /**
  * La sección 6.3: el detalle de cada cilindro del cliente, con sus días y su
@@ -19,6 +20,8 @@ import { nombreTipoCliente } from './PantallaClientes';
 export function FichaCliente({ clienteId, alVolver }: { clienteId: string; alVolver(): void }) {
   const { estado, hoy, perfil, editarCliente } = useEstado();
   const [editando, setEditando] = useState(false);
+  /** La entrega que se está por deshacer: el movimiento y la serie del cilindro. */
+  const [deshaciendo, setDeshaciendo] = useState<{ movimiento: string; serie: string } | null>(null);
   const vista = useMemo(
     () => vistaClientes(estado, hoy).find((v) => v.cliente.id === clienteId) ?? null,
     [estado, hoy, clienteId],
@@ -81,7 +84,11 @@ export function FichaCliente({ clienteId, alVolver }: { clienteId: string; alVol
               No tiene cilindros ahora mismo.
             </p>
           ) : (
-            cilindros.map(({ cilindro, arriendo, calculo }) => (
+            cilindros.map(({ cilindro, arriendo, calculo }) => {
+              // Solo si lo último que le pasó al cilindro es esta entrega: si no, no se puede deshacer.
+              const ultimo = ultimoMovimientoDe(estado, cilindro.id);
+              const entrega = ultimo?.tipo === 'entrega' && ultimo.clienteId === clienteId ? ultimo : null;
+              return (
               <div key={cilindro.id} className="px-4 py-3.5">
                 <div className="flex items-center justify-between gap-3">
                   <span className="font-mono text-base font-semibold">{cilindro.serie}</span>
@@ -97,8 +104,19 @@ export function FichaCliente({ clienteId, alVolver }: { clienteId: string; alVol
 
                   {calculo !== null && <Importe valor={calculo.importe} />}
                 </div>
+
+                {entrega !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setDeshaciendo({ movimiento: entrega.id, serie: cilindro.serie })}
+                    className="mt-1.5 -ml-1 min-h-11 px-1 text-sm font-semibold text-cargo"
+                  >
+                    Deshacer entrega
+                  </button>
+                )}
               </div>
-            ))
+              );
+            })
           )}
         </Bloque>
 
@@ -109,6 +127,14 @@ export function FichaCliente({ clienteId, alVolver }: { clienteId: string; alVol
           </div>
         )}
       </div>
+
+      {deshaciendo !== null && (
+        <DeshacerLote
+          titulo={`Entrega del ${deshaciendo.serie} a ${cliente.nombre}`}
+          movimientos={[deshaciendo.movimiento]}
+          alCerrar={() => setDeshaciendo(null)}
+        />
+      )}
     </>
   );
 }

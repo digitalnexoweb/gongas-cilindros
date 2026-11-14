@@ -16,7 +16,7 @@ import { BotonEditar } from '../BotonEditar';
 import { Bloque, Dato } from '../Dato';
 import { EditarCilindro } from '../EditarCilindro';
 import { Encabezado } from '../Encabezado';
-import { cuandoEnFrase } from '../hora';
+import { cuandoEnFrase, enMontevideo } from '../hora';
 import { Importe } from '../Importe';
 import { nombreKilos } from '../../dominio/tipos';
 
@@ -190,11 +190,18 @@ function Movimiento({
   const esEntrega = movimiento.tipo === 'entrega';
   const cliente =
     movimiento.clienteId === null ? null : clientePorId(estado, movimiento.clienteId);
+  // Un movimiento deshecho no se borra: queda tachado, con quién y cuándo lo deshizo.
+  const deshecho = movimiento.deshecho;
+  const cuandoDeshecho = deshecho === undefined ? null : enMontevideo(deshecho.creadoEn);
 
   return (
-    <div className="px-4 py-3">
+    <div className={`px-4 py-3 ${deshecho === undefined ? '' : 'bg-fondo'}`}>
       <div className="flex items-baseline justify-between gap-3">
-        <span className={`text-sm font-semibold ${esEntrega ? 'text-cargo' : 'text-gracia'}`}>
+        <span
+          className={`text-sm font-semibold ${
+            deshecho !== undefined ? 'text-tinta-2 line-through' : esEntrega ? 'text-cargo' : 'text-gracia'
+          }`}
+        >
           {esEntrega ? 'Entrega' : 'Devolución'}
         </span>
         <span className="shrink-0 text-sm tabular-nums text-slate-500">
@@ -206,6 +213,13 @@ function Movimiento({
         {cliente === null ? 'A stock' : cliente.nombre}
         {movimiento.tipoGas != null && ` · ${movimiento.tipoGas.toLowerCase()}`} · {movimiento.operador}
       </p>
+
+      {deshecho !== undefined && (
+        <p className="mt-0.5 text-sm font-semibold text-tinta-2">
+          Deshecho por {deshecho.operador}
+          {cuandoDeshecho !== null && ` · ${formatearFecha(cuandoDeshecho.fecha)} ${cuandoDeshecho.hora}`}
+        </p>
+      )}
     </div>
   );
 }

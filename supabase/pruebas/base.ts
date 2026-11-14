@@ -163,16 +163,18 @@ export async function crearBase(): Promise<Base> {
         serie,
       ]);
 
-      await duenio.afectadas(
-        `insert into public.arriendos (cilindro_id, cliente_id, fecha_entrega)
-         values ($1, $2, public.hoy_montevideo() - $3::int)`,
-        [id, clienteId, dias],
-      );
-      await duenio.afectadas(
+      // Igual que confirmar_lote (0016): primero el movimiento, y el arriendo apunta a él.
+      const movimiento = await uno<{ id: string }>(
         `insert into public.movimientos (tipo, cilindro_id, cliente_id, fecha, lote_id, operador_id, operador)
          select 'entrega', $1, $2, public.hoy_montevideo() - $3::int, gen_random_uuid(), p.id, p.nombre
-         from public.perfiles p where p.id = $4`,
+         from public.perfiles p where p.id = $4
+         returning id`,
         [id, clienteId, dias, operadorId],
+      );
+      await duenio.afectadas(
+        `insert into public.arriendos (cilindro_id, cliente_id, fecha_entrega, abierto_por)
+         values ($1, $2, public.hoy_montevideo() - $3::int, $4)`,
+        [id, clienteId, dias, movimiento.id],
       );
     },
 

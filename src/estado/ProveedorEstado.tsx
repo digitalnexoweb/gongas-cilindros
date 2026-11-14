@@ -67,6 +67,11 @@ type ContextoEstado = {
     /** El gas de cada serie, en el mismo orden. Solo en las entregas. */
     gases?: (string | null)[],
   ): Promise<LoteConfirmado>;
+  /**
+   * Deshace esos movimientos, todo o nada, y recarga. Si la base rechaza
+   * alguno, tira con el motivo y no cambia nada.
+   */
+  deshacerMovimientos(ids: string[]): Promise<void>;
   /** Da de alta un cliente, recarga y devuelve su id. */
   altaCliente(datos: Omit<Cliente, 'id'>): Promise<string>;
   altaCilindro(serie: string, kg: number, tipoGas?: string): Promise<void>;
@@ -229,6 +234,10 @@ export function ProveedorEstado({ children }: { children: ReactNode }) {
         const lote = await repositorio.confirmarLote(tipo, series, clienteId, gases);
         await recargar();
         return lote;
+      },
+      async deshacerMovimientos(ids) {
+        await repositorio.deshacerMovimientos(ids);
+        await recargar();
       },
       async altaCliente(datos) {
         const id = await repositorio.altaCliente(datos);

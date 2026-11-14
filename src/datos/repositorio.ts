@@ -13,6 +13,7 @@ import type { Cliente, EstadoApp, TextosAviso, TipoGas, TipoMovimiento } from '.
 import {
   armarEstado,
   type FilaArriendo,
+  type FilaAnulacion,
   type FilaAviso,
   type FilaCilindro,
   type FilaCliente,
@@ -141,14 +142,14 @@ async function traerTodo<T>(tabla: string, columnas: string, orden: string[]): P
 
 /** La foto completa del estado, tal como la base se la entrega a este usuario. */
 export async function cargarEstado(perfil: Perfil): Promise<EstadoApp> {
-  const [clientes, cilindros, tarifas, arriendos, movimientos, avisos, textos, tiposGas, pesos] = await Promise.all([
+  const [clientes, cilindros, tarifas, arriendos, movimientos, anulaciones, avisos, textos, tiposGas, pesos] = await Promise.all([
     traerTodo<FilaCliente>('clientes', 'id, nombre, tipo, documento, telefono, email, direccion, ciudad, notas', ['nombre', 'id']),
     traerTodo<FilaCilindro>('cilindros', 'id, serie, tipo_gas, kg, activo', ['serie']),
     // A un empleado esto le vuelve vacío: la base no le entrega tarifas.
     traerTodo<FilaTarifa>('tarifas', 'cilindro_id, tarifa_mensual', ['cilindro_id']),
     traerTodo<FilaArriendo>(
       'arriendos',
-      'id, cilindro_id, cliente_id, fecha_entrega, fecha_devolucion, tipo_gas',
+      'id, cilindro_id, cliente_id, fecha_entrega, fecha_devolucion, tipo_gas, abierto_por, cerrado_por',
       ['fecha_entrega', 'id'],
     ),
     traerTodo<FilaMovimiento>(
@@ -156,6 +157,7 @@ export async function cargarEstado(perfil: Perfil): Promise<EstadoApp> {
       'id, tipo, cilindro_id, cliente_id, fecha, lote_id, operador, creado_en, tipo_gas',
       ['creado_en', 'id'],
     ),
+    traerTodo<FilaAnulacion>('anulaciones', 'movimiento_id, operador, creado_en', ['creado_en', 'movimiento_id']),
     traerTodo<FilaAviso>(
       'avisos',
       'id, arriendo_id, cilindro_id, cliente_id, dias, canal, etapa, destino, operador, creado_en',
@@ -175,6 +177,7 @@ export async function cargarEstado(perfil: Perfil): Promise<EstadoApp> {
       tarifas,
       arriendos,
       movimientos,
+      anulaciones,
       avisos,
       textosAviso: textos.data as FilaTextosAviso | null,
       tiposGas,
@@ -199,6 +202,8 @@ export type LoteConfirmado = {
   hora: string;
   /** Las series que de verdad se grabaron, no las que se escanearon. */
   series: string[];
+  /** El movimiento de cada serie grabada, en el mismo orden: para poder deshacerlo. */
+  movimientos: string[];
   /** El gas de cada serie grabada, en el mismo orden. */
   gases: (string | null)[];
   avisos: AvisoLote[];
@@ -209,7 +214,7 @@ type RespuestaDeLote = {
   numero: number | null;
   fecha: string;
   hora: string;
-  movimientos: { serie: string; tipo_gas?: string | null }[];
+  movimientos: { id: string; serie: string; tipo_gas?: string | null }[];
   avisos: { serie: string; tipo: TipoAviso }[];
 };
 
@@ -240,9 +245,19 @@ export async function confirmarLote(
     fecha: lote.fecha,
     hora: lote.hora,
     series: lote.movimientos.map((m) => m.serie),
+    movimientos: lote.movimientos.map((m) => m.id),
     gases: lote.movimientos.map((m) => m.tipo_gas ?? null),
     avisos: lote.avisos.map((a) => armarAviso(a.serie, a.tipo)),
   };
+}
+
+/**
+ * Deshace esos movimientos, todo o nada: si uno no se puede, la base no
+ * deshace ninguno y el error dice cuál y por qué.
+ */
+export async function deshacerMovimientos(ids: string[]): Promise<void> {
+  const { error } = await supabase.rpc('deshacer_movimientos', { p_movimientos: ids });
+  if (error !== null) throw falla(error);
 }
 
 /** Da de alta un cliente y devuelve su id. */

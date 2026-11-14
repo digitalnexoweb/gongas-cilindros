@@ -7,6 +7,7 @@ import { linkWhatsApp, textoComprobante } from '../../dominio/mensajes';
 import { nombreKilos, type Cliente, type TipoMovimiento } from '../../dominio/tipos';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { Alerta, Reloj, Tilde, WhatsApp } from '../iconos';
+import { DeshacerLote } from './DeshacerLote';
 
 /** El número de remito como se lo dicta Joaquín a un cliente: LOTE-0001. */
 function formatearRemito(numero: number): string {
@@ -35,6 +36,7 @@ export function Comprobante({
 }) {
   const { estado, perfil } = useEstado();
   const [copiado, setCopiado] = useState(false);
+  const [deshaciendo, setDeshaciendo] = useState(false);
 
   // El texto de WhatsApp es el de siempre: el remito no entra en el mensaje.
   const texto = textoComprobante({ tipo, series: lote.series, cliente, fecha: lote.fecha, gases: lote.gases });
@@ -180,7 +182,27 @@ export function Comprobante({
             {botonCopiar}
           </>
         )}
+
+        {/* El error se nota acá, en el momento: por eso deshacer está a mano. */}
+        {n > 0 && (
+          <button
+            type="button"
+            onClick={() => setDeshaciendo(true)}
+            className="h-[50px] w-full text-base font-semibold text-cargo active:bg-cargo-suave"
+          >
+            Deshacer este lote
+          </button>
+        )}
       </div>
+
+      {deshaciendo && (
+        <DeshacerLote
+          titulo={bajada}
+          movimientos={lote.movimientos}
+          alCerrar={() => setDeshaciendo(false)}
+          alTerminar={alTerminar}
+        />
+      )}
     </div>
   );
 }

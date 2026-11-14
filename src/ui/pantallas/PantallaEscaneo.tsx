@@ -11,7 +11,8 @@ import { useEstado } from '../../estado/ProveedorEstado';
 import { AltaCilindro } from '../escaneo/AltaCilindro';
 import { Comprobante } from '../escaneo/Comprobante';
 import { ElegirCliente } from '../escaneo/ElegirCliente';
-import { ultimosLotes } from '../escaneo/ultimosLotes';
+import { ultimosLotes, type LoteReciente } from '../escaneo/ultimosLotes';
+import { DeshacerLote } from '../escaneo/DeshacerLote';
 import { Visor } from '../escaneo/Visor';
 import { Adelante, Alerta, Atras, Cruz, FlechaDerecha, FlechaIzquierda, Tilde } from '../iconos';
 import { ElegirKilos, pesosActivos } from '../ElegirKilos';
@@ -487,6 +488,7 @@ function Inicio({
 }) {
   const cobrar = useMemo(() => paraCobrar(estado, hoy), [estado, hoy]);
   const lotes = useMemo(() => ultimosLotes(estado, hoy), [estado, hoy]);
+  const [deshaciendo, setDeshaciendo] = useState<LoteReciente | null>(null);
   const primerNombre = nombre.trim().split(/\s+/)[0] ?? nombre;
 
   return (
@@ -568,7 +570,13 @@ function Inicio({
             <h2 className="mb-2 text-xs font-bold tracking-wider text-tinta-2 uppercase">Últimos lotes</h2>
             <ul className="divide-y divide-linea rounded-2xl border border-linea bg-white">
               {lotes.map((lote) => (
-                <li key={lote.loteId} className="flex items-center gap-3 px-4 py-3">
+                <li key={lote.loteId}>
+                <button
+                  type="button"
+                  onClick={() => setDeshaciendo(lote)}
+                  aria-label={`${tituloDeLote(lote)}. Tocar para deshacer`}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-fondo"
+                >
                   <span
                     className={`flex size-9 shrink-0 items-center justify-center rounded-[10px] ${
                       lote.tipo === 'entrega' ? 'bg-marca-suave text-marca' : 'bg-stock-suave text-stock'
@@ -583,20 +591,45 @@ function Inicio({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-base font-semibold">{lote.cliente}</span>
                     <span className="block text-sm text-tinta-2">
-                      {lote.tipo === 'entrega'
-                        ? plural(lote.cantidad, 'entregado', 'entregados')
-                        : plural(lote.cantidad, 'recibido', 'recibidos')}
+                      {lote.cantidad === 0
+                        ? 'Deshecho'
+                        : [
+                            lote.tipo === 'entrega'
+                              ? plural(lote.cantidad, 'entregado', 'entregados')
+                              : plural(lote.cantidad, 'recibido', 'recibidos'),
+                            ...(lote.deshechos > 0 ? [plural(lote.deshechos, 'deshecho', 'deshechos')] : []),
+                          ].join(' · ')}
                     </span>
                   </span>
                   <span className="shrink-0 text-sm text-tinta-2">{lote.cuando}</span>
+                </button>
                 </li>
               ))}
             </ul>
           </section>
         )}
       </div>
+
+      {deshaciendo !== null && (
+        <DeshacerLote
+          titulo={tituloDeLote(deshaciendo)}
+          movimientos={deshaciendo.movimientos}
+          alCerrar={() => setDeshaciendo(null)}
+        />
+      )}
     </>
   );
+}
+
+/** "Entrega a ANCAP · Hoy 14:20", "Recepción · Ayer". */
+function tituloDeLote(lote: LoteReciente): string {
+  const quien =
+    lote.tipo === 'entrega'
+      ? `Entrega a ${lote.cliente}`
+      : lote.cliente === 'Sin cliente'
+        ? 'Recepción'
+        : `Recepción de ${lote.cliente}`;
+  return `${quien} · ${lote.cuando}`;
 }
 
 /**

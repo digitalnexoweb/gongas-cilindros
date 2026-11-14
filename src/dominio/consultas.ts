@@ -169,3 +169,62 @@ export function vistaClientes(estado: EstadoApp, hoy: FechaISO): VistaCliente[] 
     };
   });
 }
+
+// ───────────────────────────────────────────────────────── Deshacer
+
+/** El último movimiento de ese cilindro que no se deshizo, o `null` si no tiene. */
+export function ultimoMovimientoDe(estado: EstadoApp, cilindroId: string): Movimiento | null {
+  // Los movimientos vienen del más viejo al más nuevo: el último vigente es el de más atrás.
+  let ultimo: Movimiento | null = null;
+  for (const m of estado.movimientos) {
+    if (m.cilindroId === cilindroId && m.deshecho === undefined) ultimo = m;
+  }
+  return ultimo;
+}
+
+/**
+ * Si ese movimiento se puede deshacer: `true`, o el motivo por el que no.
+ *
+ * Es la misma regla que aplica la base (migración 0016), para mostrarla antes
+ * de intentar: solo el último movimiento de cada cilindro, una sola vez, y no
+ * una entrega de la que ya se le avisó al cliente.
+ */
+export function sePuedeDeshacer(estado: EstadoApp, movimientoId: string): true | string {
+  const movimiento = estado.movimientos.find((m) => m.id === movimientoId);
+  if (movimiento === undefined) return 'Ese movimiento no existe.';
+  if (movimiento.deshecho !== undefined) return 'Ya se deshizo.';
+
+  if (ultimoMovimientoDe(estado, movimiento.cilindroId)?.id !== movimientoId) return 'Tuvo otro movimiento después: hay que deshacer ese primero.';
+
+  if (movimiento.tipo === 'entrega') {
+    const abierto = estado.arriendos.find((a) => a.abiertoPor === movimientoId);
+    if (abierto !== undefined && (estado.avisos ?? []).some((v) => v.arriendoId === abierto.id)) {
+      return 'Ya se le mandó un aviso al cliente.';
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Qué pasa con el cilindro si se deshace ese movimiento, para decirlo antes:
+ * "Vuelve al stock", "Vuelve a ANCAP", "Sigue en ANCAP"…
+ */
+export function alDeshacer(estado: EstadoApp, movimientoId: string): string {
+  const movimiento = estado.movimientos.find((m) => m.id === movimientoId);
+  if (movimiento === undefined) return '';
+
+  const nombre = (clienteId: string): string => clientePorId(estado, clienteId)?.nombre ?? 'el cliente';
+
+  // El arriendo que este movimiento cerró vuelve a abrirse.
+  const cerrado = estado.arriendos.find((a) => a.cerradoPor === movimientoId);
+  if (cerrado !== undefined) return `Vuelve a ${nombre(cerrado.clienteId)}`;
+
+  if (movimiento.tipo === 'devolucion') return 'Sigue en stock';
+
+  const abierto = estado.arriendos.find((a) => a.abiertoPor === movimientoId);
+  if (abierto !== undefined) return 'Vuelve al stock';
+
+  // "Ya estaba en este cliente": la entrega no abrió nada.
+  return movimiento.clienteId === null ? 'Queda como estaba' : `Sigue en ${nombre(movimiento.clienteId)}`;
+}

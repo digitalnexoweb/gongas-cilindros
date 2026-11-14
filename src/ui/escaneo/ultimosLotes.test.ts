@@ -42,9 +42,40 @@ describe('ultimosLotes', () => {
       mov({ loteId: 'l-2', tipo: 'devolucion', clienteId: 'k-armada', creadoEn: '2026-11-06T13:00:00+00:00' }),
     ]);
 
+    const [primero, segundo] = estado.movimientos;
     expect(ultimosLotes(estado, HOY)).toEqual([
-      { loteId: 'l-2', tipo: 'devolucion', cliente: 'Armada', cantidad: 1, cuando: 'Hoy 10:00' },
-      { loteId: 'l-1', tipo: 'entrega', cliente: 'ANCAP', cantidad: 2, cuando: 'Hoy 09:00' },
+      {
+        loteId: 'l-2',
+        tipo: 'devolucion',
+        cliente: 'Armada',
+        cantidad: 1,
+        deshechos: 0,
+        movimientos: [estado.movimientos[2]?.id],
+        cuando: 'Hoy 10:00',
+      },
+      {
+        loteId: 'l-1',
+        tipo: 'entrega',
+        cliente: 'ANCAP',
+        cantidad: 2,
+        deshechos: 0,
+        movimientos: [primero?.id, segundo?.id],
+        cuando: 'Hoy 09:00',
+      },
+    ]);
+  });
+
+  it('los deshechos no cuentan como entregados, pero el lote sigue en la lista', () => {
+    const deshecho = { operador: 'Ana', creadoEn: '2026-11-06T12:05:00+00:00' };
+    const estado = estadoCon([
+      mov({ loteId: 'l-1', creadoEn: '2026-11-06T12:00:00+00:00' }),
+      mov({ loteId: 'l-1', creadoEn: '2026-11-06T12:00:00+00:00', deshecho }),
+      mov({ loteId: 'l-2', creadoEn: '2026-11-06T13:00:00+00:00', deshecho }),
+    ]);
+
+    expect(ultimosLotes(estado, HOY).map((l) => [l.loteId, l.cantidad, l.deshechos, l.movimientos.length])).toEqual([
+      ['l-2', 0, 1, 1],
+      ['l-1', 1, 1, 2],
     ]);
   });
 

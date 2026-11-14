@@ -62,6 +62,8 @@ export type FilaArriendo = {
   fecha_entrega: string;
   fecha_devolucion: string | null;
   tipo_gas?: string | null;
+  abierto_por?: string | null;
+  cerrado_por?: string | null;
 };
 
 export type FilaMovimiento = {
@@ -74,6 +76,12 @@ export type FilaMovimiento = {
   operador: string;
   creado_en: string;
   tipo_gas?: string | null;
+};
+
+export type FilaAnulacion = {
+  movimiento_id: string;
+  operador: string;
+  creado_en: string;
 };
 
 export type FilaAviso = {
@@ -102,6 +110,8 @@ export type Filas = {
   tarifas: FilaTarifa[];
   arriendos: FilaArriendo[];
   movimientos: FilaMovimiento[];
+  /** Opcional: los tests de antes de poder deshacer no la traen. */
+  anulaciones?: FilaAnulacion[];
   /** Opcionales: los tests de antes de la etapa D no los traen. */
   avisos?: FilaAviso[];
   textosAviso?: FilaTextosAviso | null;
@@ -151,7 +161,11 @@ export function armarEstado(filas: Filas, operador: string): EstadoApp {
     fechaEntrega: fecha(a.fecha_entrega),
     fechaDevolucion: a.fecha_devolucion === null ? null : fecha(a.fecha_devolucion),
     ...(a.tipo_gas === undefined ? {} : { tipoGas: a.tipo_gas }),
+    ...(a.abierto_por === undefined ? {} : { abiertoPor: a.abierto_por }),
+    ...(a.cerrado_por === undefined ? {} : { cerradoPor: a.cerrado_por }),
   }));
+
+  const anulaciones = new Map((filas.anulaciones ?? []).map((a) => [a.movimiento_id, a]));
 
   // Del más viejo al más nuevo, por el momento en que se grabaron. El historial
   // de un cilindro desempata con este orden cuando dos movimientos son del mismo día.
@@ -169,6 +183,12 @@ export function armarEstado(filas: Filas, operador: string): EstadoApp {
       operador: m.operador,
       creadoEn: m.creado_en,
       ...(m.tipo_gas === undefined ? {} : { tipoGas: m.tipo_gas }),
+      ...((): Pick<Movimiento, 'deshecho'> => {
+        const anulacion = anulaciones.get(m.id);
+        return anulacion === undefined
+          ? {}
+          : { deshecho: { operador: anulacion.operador, creadoEn: anulacion.creado_en } };
+      })(),
     }));
 
   // Del más viejo al más nuevo, igual que los movimientos.

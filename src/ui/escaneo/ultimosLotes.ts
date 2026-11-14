@@ -14,7 +14,12 @@ export type LoteReciente = {
   tipo: TipoMovimiento;
   /** El cliente del lote, "Varios clientes" o "Sin cliente". */
   cliente: string;
+  /** Los cilindros que siguen valiendo: no cuenta los deshechos. */
   cantidad: number;
+  /** Cuántos se deshicieron. Si son todos, `cantidad` es 0. */
+  deshechos: number;
+  /** Los movimientos del lote, en el orden en que se grabaron: para poder deshacerlos. */
+  movimientos: string[];
   /** "Hoy 14:20", "Ayer" o "03/11". */
   cuando: string;
 };
@@ -27,6 +32,8 @@ export function ultimosLotes(estado: EstadoApp, hoy: FechaISO, cuantos = 5): Lot
     tipo: TipoMovimiento;
     clientes: Set<string | null>;
     cantidad: number;
+    deshechos: number;
+    movimientos: string[];
     /** El último movimiento del lote: la lista viene del más viejo al más nuevo. */
     orden: number;
     fecha: FechaISO;
@@ -42,7 +49,9 @@ export function ultimosLotes(estado: EstadoApp, hoy: FechaISO, cuantos = 5): Lot
         loteId: m.loteId,
         tipo: m.tipo,
         clientes: new Set([m.clienteId]),
-        cantidad: 1,
+        cantidad: m.deshecho === undefined ? 1 : 0,
+        deshechos: m.deshecho === undefined ? 0 : 1,
+        movimientos: [m.id],
         orden,
         fecha: m.fecha,
         creadoEn: m.creadoEn,
@@ -50,7 +59,9 @@ export function ultimosLotes(estado: EstadoApp, hoy: FechaISO, cuantos = 5): Lot
       return;
     }
     grupo.clientes.add(m.clienteId);
-    grupo.cantidad += 1;
+    if (m.deshecho === undefined) grupo.cantidad += 1;
+    else grupo.deshechos += 1;
+    grupo.movimientos.push(m.id);
     grupo.orden = orden;
     grupo.creadoEn = m.creadoEn ?? grupo.creadoEn;
   });
@@ -74,6 +85,8 @@ export function ultimosLotes(estado: EstadoApp, hoy: FechaISO, cuantos = 5): Lot
         tipo: g.tipo,
         cliente,
         cantidad: g.cantidad,
+        deshechos: g.deshechos,
+        movimientos: g.movimientos,
         cuando:
           momento === null ? cuando(g.fecha, null, hoy) : cuando(momento.fecha, momento.hora, hoy),
       };

@@ -72,6 +72,10 @@ export type Arriendo = {
   fechaDevolucion: FechaISO | null;
   /** El gas con el que salió. Solo viene de la base; la demo no lo tiene. */
   tipoGas?: string | null;
+  /** El movimiento de entrega que lo abrió. Solo viene de la base. */
+  abiertoPor?: string | null;
+  /** El movimiento que lo cerró: una devolución o una entrega a otro cliente. */
+  cerradoPor?: string | null;
 };
 
 export type TipoMovimiento = 'entrega' | 'devolucion';
@@ -94,6 +98,11 @@ export type Movimiento = {
   creadoEn?: string;
   /** En una entrega, el gas con el que salió; en una devolución, con el que había salido. */
   tipoGas?: string | null;
+  /**
+   * Si alguien lo deshizo: quién y cuándo. El movimiento no se borra, queda en
+   * el historial marcado; los arriendos ya volvieron a como estaban antes.
+   */
+  deshecho?: { operador: string; creadoEn: string };
 };
 
 /**
