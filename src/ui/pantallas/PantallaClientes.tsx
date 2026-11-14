@@ -1,17 +1,38 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import { formatearPesos } from '../../dominio/arriendo';
 import { vistaClientes, type VistaCliente } from '../../dominio/consultas';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { Encabezado } from '../Encabezado';
+import { FormularioCliente } from '../FormularioCliente';
 import { Importe } from '../Importe';
 
 export const nombreTipoCliente = { empresa: 'Empresa', particular: 'Particular' } as const;
 
-/** La sección 6.3: un cliente por fila, con cuántos cilindros tiene y cuánto acumula. */
+/**
+ * La sección 6.3: un cliente por fila, con cuántos cilindros tiene y cuánto
+ * acumula. También se da de alta un cliente desde acá, sin tener que entregarle
+ * nada: al crearlo se abre su ficha.
+ */
 export function PantallaClientes({ alAbrir }: { alAbrir(clienteId: string): void }) {
-  const { estado, hoy } = useEstado();
+  const { estado, hoy, altaCliente } = useEstado();
   const vistas = useMemo(() => vistaClientes(estado, hoy), [estado, hoy]);
+  const [dandoDeAlta, setDandoDeAlta] = useState(false);
+
+  if (dandoDeAlta) {
+    return (
+      <FormularioCliente
+        titulo="Cliente nuevo"
+        textoBoton="Crear cliente"
+        alVolver={() => setDandoDeAlta(false)}
+        alGuardar={async (datos) => {
+          const id = await altaCliente(datos);
+          setDandoDeAlta(false);
+          alAbrir(id);
+        }}
+      />
+    );
+  }
 
   // Si de algún cliente no se puede ver el total, no hay total general: sería falso.
   const total = vistas.some((v) => v.total === null)
@@ -25,6 +46,15 @@ export function PantallaClientes({ alAbrir }: { alAbrir(clienteId: string): void
       <Encabezado
         titulo="Clientes"
         bajada={total === null ? cuantos : `${cuantos} · ${formatearPesos(total)} en total`}
+        accion={
+          <button
+            type="button"
+            onClick={() => setDandoDeAlta(true)}
+            className="h-11 rounded-[15px] bg-marca px-4 text-sm font-semibold text-white active:bg-marca-tinta"
+          >
+            Nuevo
+          </button>
+        }
       />
 
       {vistas.length === 0 ? (
