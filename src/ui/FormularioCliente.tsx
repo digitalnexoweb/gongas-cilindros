@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import type { Cliente, TipoCliente } from '../dominio/tipos';
 import { Encabezado } from './Encabezado';
-import { Campo, ErrorDeFormulario, Opciones, claseBotonPrincipal } from './Formulario';
+import { Campo, ErrorDeFormulario, Opciones, claseBotonPrincipal, claseBotonSecundario } from './Formulario';
 
 /**
  * Nombre, tipo, documento y teléfono. Sirve para el alta de 6.1, al entregar, y
@@ -14,12 +14,18 @@ export function FormularioCliente({
   inicial,
   alGuardar,
   alVolver,
+  borrar,
 }: {
   titulo: string;
   textoBoton: string;
   inicial?: Omit<Cliente, 'id'>;
   alGuardar(datos: Omit<Cliente, 'id'>): Promise<void>;
   alVolver(): void;
+  /**
+   * Solo al editar, y solo para el administrador. `motivo` es por qué no se
+   * puede borrar, o `null` si se puede.
+   */
+  borrar?: { motivo: string | null; alBorrar(): Promise<void> };
 }) {
   const [nombre, setNombre] = useState(inicial?.nombre ?? '');
   const [tipo, setTipo] = useState<TipoCliente>(inicial?.tipo ?? 'empresa');
@@ -117,7 +123,70 @@ export function FormularioCliente({
         <button type="submit" disabled={!listo} className={claseBotonPrincipal}>
           {guardando ? 'Guardando…' : textoBoton}
         </button>
+
+        {borrar !== undefined && <BorrarCliente nombre={inicial?.nombre ?? ''} {...borrar} />}
       </div>
     </form>
+  );
+}
+
+/** Al pie de la edición: borrar el cliente, con confirmación, o el motivo por el que no se puede. */
+function BorrarCliente({
+  nombre,
+  motivo,
+  alBorrar,
+}: {
+  nombre: string;
+  motivo: string | null;
+  alBorrar(): Promise<void>;
+}) {
+  const [confirmando, setConfirmando] = useState(false);
+  const [borrando, setBorrando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function confirmar() {
+    if (borrando) return;
+    setBorrando(true);
+    setError(null);
+    alBorrar().catch((falla: unknown) => {
+      setError(falla instanceof Error ? falla.message : 'No se pudo borrar el cliente.');
+      setBorrando(false);
+      setConfirmando(false);
+    });
+  }
+
+  return (
+    <div className="mt-4 border-t border-linea pt-5">
+      {confirmando ? (
+        <div className="space-y-2 rounded-2xl border border-cargo-borde bg-cargo-suave p-4">
+          <p className="text-base font-semibold text-cargo">¿Borrar a {nombre} para siempre?</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => setConfirmando(false)} className={claseBotonSecundario}>
+              No
+            </button>
+            <button
+              type="button"
+              onClick={confirmar}
+              disabled={borrando}
+              className="h-[50px] w-full rounded-[15px] bg-cargo text-base font-bold text-white disabled:opacity-60"
+            >
+              {borrando ? 'Borrando…' : 'Sí, borrar'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setConfirmando(true)}
+          disabled={motivo !== null}
+          className="h-[50px] w-full rounded-[15px] border-[1.5px] border-cargo-borde bg-white text-base font-semibold text-cargo active:bg-cargo-suave disabled:border-linea disabled:text-tinta-3"
+        >
+          Borrar cliente
+        </button>
+      )}
+
+      {motivo !== null && <p className="mt-2 text-sm text-tinta-2">{motivo}</p>}
+      <ErrorDeFormulario mensaje={error} />
+    </div>
   );
 }

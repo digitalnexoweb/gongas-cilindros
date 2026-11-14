@@ -12,6 +12,9 @@ import { ErrorDeFormulario, claseBotonPrincipal, claseBotonSecundario } from '..
  * Arranca con todo lo que se puede deshacer marcado; lo que no se puede
  * aparece igual, sin casilla y con el motivo, para que se entienda por qué.
  * Pide confirmar antes de tocar la base.
+ *
+ * Lo que ya se deshizo se puede borrar del todo desde acá: no tiene ningún
+ * efecto, y así no queda ensuciando "Últimos lotes" ni el historial.
  */
 export function DeshacerLote({
   titulo,
@@ -27,7 +30,7 @@ export function DeshacerLote({
   /** Después de deshacer, antes de cerrar. */
   alTerminar?(): void;
 }) {
-  const { estado, deshacerMovimientos } = useEstado();
+  const { estado, deshacerMovimientos, borrarDeshechos } = useEstado();
 
   const filas = useMemo(
     () =>
@@ -48,7 +51,8 @@ export function DeshacerLote({
   const [marcados, setMarcados] = useState<Set<string>>(
     () => new Set(filas.filter((f) => f.puede).map((f) => f.id)),
   );
-  const [confirmando, setConfirmando] = useState(false);
+  /** Qué se está por confirmar: deshacer lo marcado o borrar lo ya deshecho. */
+  const [confirmando, setConfirmando] = useState<'deshacer' | 'borrar' | null>(null);
   const [deshaciendo, setDeshaciendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,8 +60,11 @@ export function DeshacerLote({
   const n = elegidos.length;
   const cuantos = n === 1 ? '1 cilindro' : `${n} cilindros`;
 
+  const deshechos = movimientos.filter((id) => estado.movimientos.find((m) => m.id === id)?.deshecho !== undefined);
+  const todoDeshecho = deshechos.length > 0 && deshechos.length === movimientos.length;
+
   function alternar(id: string) {
-    setConfirmando(false);
+    setConfirmando(null);
     setMarcados((antes) => {
       const despues = new Set(antes);
       if (despues.has(id)) despues.delete(id);
@@ -79,7 +86,21 @@ export function DeshacerLote({
       .catch((falla: unknown) => {
         setError(falla instanceof Error ? falla.message : 'No se pudo deshacer.');
         setDeshaciendo(false);
-        setConfirmando(false);
+        setConfirmando(null);
+      });
+  }
+
+  function borrar() {
+    if (deshaciendo || deshechos.length === 0) return;
+
+    setDeshaciendo(true);
+    setError(null);
+    borrarDeshechos(deshechos)
+      .then(() => alCerrar())
+      .catch((falla: unknown) => {
+        setError(falla instanceof Error ? falla.message : 'No se pudo borrar.');
+        setDeshaciendo(false);
+        setConfirmando(null);
       });
   }
 
@@ -92,7 +113,7 @@ export function DeshacerLote({
         onClick={(e) => e.stopPropagation()}
       >
         <div>
-          <h2 className="font-titulo text-xl font-bold">Deshacer</h2>
+          <h2 className="font-titulo text-xl font-bold">{todoDeshecho ? 'Lote deshecho' : 'Deshacer'}</h2>
           <p className="mt-1 text-sm text-tinta-2">{titulo}</p>
         </div>
 
@@ -122,42 +143,76 @@ export function DeshacerLote({
         </ul>
 
         <p className="text-sm text-tinta-2">
-          El movimiento no se borra: queda en el historial como deshecho, con tu nombre.
+          {todoDeshecho
+            ? 'Este lote ya está deshecho: no tiene ningún efecto. Se puede borrar para que no quede en la lista.'
+            : 'Al deshacer, el movimiento queda en el historial como deshecho, con tu nombre.'}
         </p>
 
         <ErrorDeFormulario mensaje={error} />
 
-        {confirmando ? (
+        {confirmando !== null ? (
           <div className="space-y-2 rounded-2xl border border-cargo-borde bg-cargo-suave p-4">
-            <p className="text-base font-semibold text-cargo">¿Deshacer {cuantos}?</p>
+            <p className="text-base font-semibold text-cargo">
+              {confirmando === 'deshacer'
+                ? `¿Deshacer ${cuantos}?`
+                : todoDeshecho
+                  ? '¿Borrar este lote para siempre?'
+                  : `¿Borrar ${deshechos.length === 1 ? 'el deshecho' : `los ${deshechos.length} deshechos`} para siempre?`}
+            </p>
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => setConfirmando(false)} className={claseBotonSecundario}>
+              <button type="button" onClick={() => setConfirmando(null)} className={claseBotonSecundario}>
                 No
               </button>
               <button
                 type="button"
-                onClick={deshacer}
+                onClick={confirmando === 'deshacer' ? deshacer : borrar}
                 disabled={deshaciendo}
                 className="h-[50px] w-full rounded-[15px] bg-cargo text-base font-bold text-white disabled:opacity-60"
               >
-                {deshaciendo ? 'Deshaciendo…' : 'Sí, deshacer'}
+                {deshaciendo
+                  ? confirmando === 'deshacer' ? 'Deshaciendo…' : 'Borrando…'
+                  : confirmando === 'deshacer' ? 'Sí, deshacer' : 'Sí, borrar'}
               </button>
             </div>
           </div>
-        ) : (
+        ) : todoDeshecho ? (
           <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={alCerrar} className={claseBotonSecundario}>
               Cerrar
             </button>
             <button
               type="button"
-              onClick={() => setConfirmando(true)}
-              disabled={n === 0}
-              className={claseBotonPrincipal}
+              onClick={() => setConfirmando('borrar')}
+              className="h-[50px] w-full rounded-[15px] bg-cargo text-base font-bold text-white"
             >
-              {n === 0 ? 'Nada para deshacer' : `Deshacer ${cuantos}`}
+              Borrar este lote
             </button>
           </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={alCerrar} className={claseBotonSecundario}>
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmando('deshacer')}
+                disabled={n === 0}
+                className={claseBotonPrincipal}
+              >
+                {n === 0 ? 'Nada para deshacer' : `Deshacer ${cuantos}`}
+              </button>
+            </div>
+            {deshechos.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setConfirmando('borrar')}
+                className="h-11 w-full text-base font-semibold text-cargo active:bg-cargo-suave"
+              >
+                {deshechos.length === 1 ? 'Borrar el deshecho' : `Borrar los ${deshechos.length} deshechos`}
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -72,6 +72,10 @@ type ContextoEstado = {
    * alguno, tira con el motivo y no cambia nada.
    */
   deshacerMovimientos(ids: string[]): Promise<void>;
+  /** Borra del todo movimientos ya deshechos, y recarga. */
+  borrarDeshechos(ids: string[]): Promise<void>;
+  /** Solo el administrador, y solo un cliente sin historia real. Recarga. */
+  borrarCliente(id: string): Promise<void>;
   /** Da de alta un cliente, recarga y devuelve su id. */
   altaCliente(datos: Omit<Cliente, 'id'>): Promise<string>;
   altaCilindro(serie: string, kg: number, tipoGas?: string): Promise<void>;
@@ -237,6 +241,14 @@ export function ProveedorEstado({ children }: { children: ReactNode }) {
       },
       async deshacerMovimientos(ids) {
         await repositorio.deshacerMovimientos(ids);
+        await recargar();
+      },
+      async borrarDeshechos(ids) {
+        await repositorio.borrarDeshechos(ids);
+        await recargar();
+      },
+      async borrarCliente(id) {
+        await repositorio.borrarCliente(id);
         await recargar();
       },
       async altaCliente(datos) {

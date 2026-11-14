@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import { formatearFecha } from '../../dominio/arriendo';
-import { ultimoMovimientoDe, vistaClientes } from '../../dominio/consultas';
+import { sePuedeBorrarCliente, ultimoMovimientoDe, vistaClientes } from '../../dominio/consultas';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { ChipEstado, estadoVisible } from '../ChipEstado';
 import { Bloque, Dato } from '../Dato';
@@ -18,7 +18,7 @@ import { DeshacerLote } from '../escaneo/DeshacerLote';
  * importe. El administrador además puede corregir sus datos.
  */
 export function FichaCliente({ clienteId, alVolver }: { clienteId: string; alVolver(): void }) {
-  const { estado, hoy, perfil, editarCliente } = useEstado();
+  const { estado, hoy, perfil, editarCliente, borrarCliente } = useEstado();
   const [editando, setEditando] = useState(false);
   /** La entrega que se está por deshacer: el movimiento y la serie del cilindro. */
   const [deshaciendo, setDeshaciendo] = useState<{ movimiento: string; serie: string } | null>(null);
@@ -38,6 +38,13 @@ export function FichaCliente({ clienteId, alVolver }: { clienteId: string; alVol
         alGuardar={async (nuevos) => {
           await editarCliente(clienteId, nuevos);
           setEditando(false);
+        }}
+        borrar={{
+          motivo: ((p) => (p === true ? null : p))(sePuedeBorrarCliente(estado, clienteId)),
+          alBorrar: async () => {
+            await borrarCliente(clienteId);
+            alVolver();
+          },
         }}
       />
     );

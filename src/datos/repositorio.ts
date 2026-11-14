@@ -260,6 +260,18 @@ export async function deshacerMovimientos(ids: string[]): Promise<void> {
   if (error !== null) throw falla(error);
 }
 
+/** Borra del todo esos movimientos, que tienen que estar deshechos. Todo o nada. */
+export async function borrarDeshechos(ids: string[]): Promise<void> {
+  const { error } = await supabase.rpc('borrar_deshechos', { p_movimientos: ids });
+  if (error !== null) throw falla(error);
+}
+
+/** Solo el administrador, y solo un cliente sin historia real. */
+export async function borrarCliente(id: string): Promise<void> {
+  const { error } = await supabase.rpc('borrar_cliente', { p_cliente_id: id });
+  if (error !== null) throw falla(error);
+}
+
 /** Da de alta un cliente y devuelve su id. */
 export async function altaCliente(datos: Omit<Cliente, 'id'>): Promise<string> {
   const { data, error } = await supabase

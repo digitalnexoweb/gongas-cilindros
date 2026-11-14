@@ -228,3 +228,20 @@ export function alDeshacer(estado: EstadoApp, movimientoId: string): string {
   // "Ya estaba en este cliente": la entrega no abrió nada.
   return movimiento.clienteId === null ? 'Queda como estaba' : `Sigue en ${nombre(movimiento.clienteId)}`;
 }
+
+/**
+ * Si ese cliente se puede borrar: `true`, o el motivo por el que no. La misma
+ * regla que aplica la base (migración 0017): solo un cliente sin historia real.
+ * Sus movimientos deshechos no cuentan: se borran con él.
+ */
+export function sePuedeBorrarCliente(estado: EstadoApp, clienteId: string): true | string {
+  const arriendos = estado.arriendos.filter((a) => a.clienteId === clienteId);
+  if (arriendos.some((a) => a.fechaDevolucion === null)) return 'Tiene cilindros en su poder: no se puede borrar.';
+
+  const conHistoria =
+    arriendos.length > 0 ||
+    estado.movimientos.some((m) => m.clienteId === clienteId && m.deshecho === undefined) ||
+    (estado.avisos ?? []).some((v) => v.clienteId === clienteId);
+
+  return conHistoria ? 'Tiene entregas registradas: no se puede borrar sin perder su historia.' : true;
+}

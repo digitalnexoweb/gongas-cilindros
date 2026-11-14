@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { alDeshacer, sePuedeDeshacer } from './consultas';
+import { alDeshacer, sePuedeBorrarCliente, sePuedeDeshacer } from './consultas';
 import type { Arriendo, EstadoApp, Movimiento } from './tipos';
 
 /**
@@ -130,5 +130,29 @@ describe('alDeshacer', () => {
       [arriendo('a1', 'ancap', 'm1')],
     );
     expect(alDeshacer(e, 'm2')).toBe('Sigue en ANCAP');
+  });
+});
+
+describe('sePuedeBorrarCliente', () => {
+  it('uno que nunca tuvo nada, sí', () => {
+    expect(sePuedeBorrarCliente(estado([], []), 'armada')).toBe(true);
+  });
+
+  it('uno con solo entregas deshechas, sí: se borran con él', () => {
+    const e = estado([mov('m1', 'entrega', 'ancap', true)], []);
+    expect(sePuedeBorrarCliente(e, 'ancap')).toBe(true);
+  });
+
+  it('con cilindros en su poder, no', () => {
+    const e = estado([mov('m1', 'entrega', 'ancap')], [arriendo('a1', 'ancap', 'm1')]);
+    expect(sePuedeBorrarCliente(e, 'ancap')).toMatch(/cilindros en su poder/);
+  });
+
+  it('con historia real, aunque ya haya devuelto todo, no', () => {
+    const e = estado(
+      [mov('m1', 'entrega', 'ancap'), mov('m2', 'devolucion', 'ancap')],
+      [arriendo('a1', 'ancap', 'm1', 'm2')],
+    );
+    expect(sePuedeBorrarCliente(e, 'ancap')).toMatch(/entregas registradas/);
   });
 });
