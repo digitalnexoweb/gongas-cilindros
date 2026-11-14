@@ -8,7 +8,7 @@ import { ChipEstado, estadoVisible, type EstadoVisible } from '../ChipEstado';
 import { Encabezado } from '../Encabezado';
 import { Importe } from '../Importe';
 
-type Filtro = 'todos' | EstadoVisible;
+type Filtro = 'todos' | EstadoVisible | 'de_baja';
 
 const filtros: { id: Filtro; etiqueta: string }[] = [
   { id: 'todos', etiqueta: 'Todos' },
@@ -16,6 +16,8 @@ const filtros: { id: Filtro; etiqueta: string }[] = [
   { id: 'en_gracia', etiqueta: 'En gracia' },
   { id: 'por_vencer', etiqueta: 'Por vencer' },
   { id: 'generando_cargo', etiqueta: 'Generando cargo' },
+  // Los dados de baja no se mezclan con los demás: solo aparecen con este filtro.
+  { id: 'de_baja', etiqueta: 'De baja' },
 ];
 
 /** La sección 6.2: lista de todos los cilindros, con filtros y buscador por serie. */
@@ -25,12 +27,18 @@ export function PantallaCilindros({ alAbrir }: { alAbrir(cilindroId: string): vo
   const [filtro, setFiltro] = useState<Filtro>('todos');
 
   const todas = useMemo(() => vistaCilindros(estado, hoy), [estado, hoy]);
+  const enUso = useMemo(() => todas.filter((v) => v.cilindro.activo), [todas]);
 
   const visibles = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
 
     return todas.filter((vista) => {
-      if (filtro !== 'todos' && estadoVisible(vista.calculo) !== filtro) return false;
+      if (filtro === 'de_baja') {
+        if (vista.cilindro.activo) return false;
+      } else {
+        if (!vista.cilindro.activo) return false;
+        if (filtro !== 'todos' && estadoVisible(vista.calculo) !== filtro) return false;
+      }
       if (texto !== '' && !vista.cilindro.serie.toLowerCase().includes(texto)) return false;
       return true;
     });
@@ -41,9 +49,11 @@ export function PantallaCilindros({ alAbrir }: { alAbrir(cilindroId: string): vo
       <Encabezado
         titulo="Cilindros"
         bajada={
-          visibles.length === todas.length
-            ? `${todas.length} en total`
-            : `${visibles.length} de ${todas.length}`
+          filtro === 'de_baja'
+            ? `${visibles.length} dados de baja`
+            : visibles.length === enUso.length
+              ? `${enUso.length} en total`
+              : `${visibles.length} de ${enUso.length}`
         }
       >
         <Buscador valor={busqueda} alCambiar={setBusqueda} marcador="Buscar por serie" />

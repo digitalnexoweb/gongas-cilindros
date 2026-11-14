@@ -52,6 +52,7 @@ export function FichaCilindro({
         cilindro={cilindro}
         enUnCliente={vista.ubicacion.lugar === 'cliente'}
         alVolver={() => setEditando(false)}
+        alBorrar={alVolver}
       />
     );
   }

@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 
 import { tarifasPorKilos } from '../datos/repositorio';
 import { formatearPesos } from '../dominio/arriendo';
+import { sePuedeBorrarCilindro } from '../dominio/consultas';
 import type { Cilindro } from '../dominio/tipos';
 import { useEstado } from '../estado/ProveedorEstado';
+import { BotonBorrar } from './BotonBorrar';
 import { ElegirKilos, pesosActivos } from './ElegirKilos';
 import { Encabezado } from './Encabezado';
 import {
@@ -23,13 +25,17 @@ export function EditarCilindro({
   cilindro,
   enUnCliente,
   alVolver,
+  alBorrar,
 }: {
   cilindro: Cilindro;
   /** Un cilindro en un cliente no se puede dar de baja: primero se recibe. */
   enUnCliente: boolean;
   alVolver(): void;
+  /** Después de borrarlo: la ficha ya no existe, hay que salir de ella. */
+  alBorrar(): void;
 }) {
-  const { estado, editarCilindro } = useEstado();
+  const { estado, editarCilindro, borrarCilindro } = useEstado();
+  const puedeBorrar = sePuedeBorrarCilindro(estado, cilindro.id);
   const gases = (estado.tiposGas ?? []).filter((g) => g.activo).map((g) => g.nombre);
 
   const pesos = pesosActivos(estado.pesos);
@@ -147,6 +153,16 @@ export function EditarCilindro({
             Cancelar
           </button>
         </div>
+
+        <BotonBorrar
+          texto="Borrar cilindro"
+          pregunta={`¿Borrar el ${cilindro.serie} para siempre?`}
+          motivo={puedeBorrar === true ? null : puedeBorrar}
+          alBorrar={async () => {
+            await borrarCilindro(cilindro.id);
+            alBorrar();
+          }}
+        />
       </div>
     </form>
   );

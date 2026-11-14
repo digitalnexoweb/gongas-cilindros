@@ -76,6 +76,8 @@ type ContextoEstado = {
   borrarDeshechos(ids: string[]): Promise<void>;
   /** Solo el administrador, y solo un cliente sin historia real. Recarga. */
   borrarCliente(id: string): Promise<void>;
+  /** Solo el administrador, y solo un cilindro sin historia real. Recarga. */
+  borrarCilindro(id: string): Promise<void>;
   /** Da de alta un cliente, recarga y devuelve su id. */
   altaCliente(datos: Omit<Cliente, 'id'>): Promise<string>;
   altaCilindro(serie: string, kg: number, tipoGas?: string): Promise<void>;
@@ -249,6 +251,10 @@ export function ProveedorEstado({ children }: { children: ReactNode }) {
       },
       async borrarCliente(id) {
         await repositorio.borrarCliente(id);
+        await recargar();
+      },
+      async borrarCilindro(id) {
+        await repositorio.borrarCilindro(id);
         await recargar();
       },
       async altaCliente(datos) {

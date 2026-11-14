@@ -272,6 +272,12 @@ export async function borrarCliente(id: string): Promise<void> {
   if (error !== null) throw falla(error);
 }
 
+/** Solo el administrador, y solo un cilindro sin historia real. */
+export async function borrarCilindro(id: string): Promise<void> {
+  const { error } = await supabase.rpc('borrar_cilindro', { p_cilindro_id: id });
+  if (error !== null) throw falla(error);
+}
+
 /** Da de alta un cliente y devuelve su id. */
 export async function altaCliente(datos: Omit<Cliente, 'id'>): Promise<string> {
   const { data, error } = await supabase

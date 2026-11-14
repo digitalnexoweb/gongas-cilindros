@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { alDeshacer, sePuedeBorrarCliente, sePuedeDeshacer } from './consultas';
+import { alDeshacer, sePuedeBorrarCilindro, sePuedeBorrarCliente, sePuedeDeshacer } from './consultas';
 import type { Arriendo, EstadoApp, Movimiento } from './tipos';
 
 /**
@@ -154,5 +154,28 @@ describe('sePuedeBorrarCliente', () => {
       [arriendo('a1', 'ancap', 'm1', 'm2')],
     );
     expect(sePuedeBorrarCliente(e, 'ancap')).toMatch(/entregas registradas/);
+  });
+});
+
+describe('sePuedeBorrarCilindro', () => {
+  it('uno sin movimientos, sí', () => {
+    expect(sePuedeBorrarCilindro(estado([], []), 'c1')).toBe(true);
+  });
+
+  it('uno con solo movimientos deshechos, sí', () => {
+    expect(sePuedeBorrarCilindro(estado([mov('m1', 'entrega', 'ancap', true)], []), 'c1')).toBe(true);
+  });
+
+  it('en un cliente, no', () => {
+    const e = estado([mov('m1', 'entrega', 'ancap')], [arriendo('a1', 'ancap', 'm1')]);
+    expect(sePuedeBorrarCilindro(e, 'c1')).toMatch(/Está en un cliente/);
+  });
+
+  it('con historia real, no: se puede dar de baja', () => {
+    const e = estado(
+      [mov('m1', 'entrega', 'ancap'), mov('m2', 'devolucion', 'ancap')],
+      [arriendo('a1', 'ancap', 'm1', 'm2')],
+    );
+    expect(sePuedeBorrarCilindro(e, 'c1')).toMatch(/dar de baja/);
   });
 });

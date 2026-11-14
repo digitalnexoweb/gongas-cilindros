@@ -172,3 +172,60 @@ describe('borrar_cliente', () => {
     await expect(borrarCliente(cliente, null)).rejects.toThrow(/permission denied/);
   });
 });
+
+describe('borrar_cilindro', () => {
+  async function borrarCilindro(serie: string, usuario: string | null = joaquin): Promise<void> {
+    const [fila] = await base.duenio.filas<{ id: string }>('select id from public.cilindros where serie = $1', [serie]);
+    await base.como(usuario, (s) => s.filas('select public.borrar_cilindro($1)', [fila?.id]));
+  }
+
+  async function existeCilindro(serie: string): Promise<boolean> {
+    return (await base.duenio.filas('select 1 from public.cilindros where serie = $1', [serie])).length > 0;
+  }
+
+  it('uno recién dado de alta, con su tarifa', async () => {
+    await base.crearCilindro('CIL-BOR-1');
+    await borrarCilindro('CIL-BOR-1');
+    expect(await existeCilindro('CIL-BOR-1')).toBe(false);
+  });
+
+  it('uno con solo movimientos deshechos: se borran con él', async () => {
+    const cliente = await base.crearCliente('Para cilindro deshecho');
+    await base.crearCilindro('CIL-BOR-2');
+    const ids = await lote('entrega', ['CIL-BOR-2'], cliente);
+    await deshacer(ids);
+
+    await borrarCilindro('CIL-BOR-2');
+    expect(await existeCilindro('CIL-BOR-2')).toBe(false);
+    expect(await existe('movimientos', 'id', ids[0] ?? '')).toBe(false);
+  });
+
+  it('en un cliente, no', async () => {
+    const cliente = await base.crearCliente('Con cilindro a borrar');
+    await base.crearCilindro('CIL-BOR-3');
+    await lote('entrega', ['CIL-BOR-3'], cliente);
+
+    await expect(borrarCilindro('CIL-BOR-3')).rejects.toThrow(/Está en un cliente/);
+  });
+
+  it('con historia real (ya volvió), no', async () => {
+    const cliente = await base.crearCliente('Historia de cilindro');
+    await base.crearCilindro('CIL-BOR-4');
+    await lote('entrega', ['CIL-BOR-4'], cliente);
+    await lote('devolucion', ['CIL-BOR-4']);
+
+    await expect(borrarCilindro('CIL-BOR-4')).rejects.toThrow(/movimientos registrados/);
+    expect(await existeCilindro('CIL-BOR-4')).toBe(true);
+  });
+
+  it('un operario, no', async () => {
+    await base.crearCilindro('CIL-BOR-5');
+    await expect(borrarCilindro('CIL-BOR-5', operario)).rejects.toThrow(/Solo el administrador/);
+    expect(await existeCilindro('CIL-BOR-5')).toBe(true);
+  });
+
+  it('sin sesión, no', async () => {
+    await base.crearCilindro('CIL-BOR-6');
+    await expect(borrarCilindro('CIL-BOR-6', null)).rejects.toThrow(/permission denied/);
+  });
+});

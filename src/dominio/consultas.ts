@@ -245,3 +245,21 @@ export function sePuedeBorrarCliente(estado: EstadoApp, clienteId: string): true
 
   return conHistoria ? 'Tiene entregas registradas: no se puede borrar sin perder su historia.' : true;
 }
+
+/**
+ * Si ese cilindro se puede borrar: `true`, o el motivo por el que no. La misma
+ * regla que aplica la base (migración 0018): solo uno sin historia real.
+ */
+export function sePuedeBorrarCilindro(estado: EstadoApp, cilindroId: string): true | string {
+  const arriendos = estado.arriendos.filter((a) => a.cilindroId === cilindroId);
+  if (arriendos.some((a) => a.fechaDevolucion === null)) return 'Está en un cliente: no se puede borrar.';
+
+  const conHistoria =
+    arriendos.length > 0 ||
+    estado.movimientos.some((m) => m.cilindroId === cilindroId && m.deshecho === undefined) ||
+    (estado.avisos ?? []).some((v) => v.cilindroId === cilindroId);
+
+  return conHistoria
+    ? 'Tiene movimientos registrados: no se puede borrar sin perder su historia. Se puede dar de baja.'
+    : true;
+}
