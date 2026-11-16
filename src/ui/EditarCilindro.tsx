@@ -34,7 +34,7 @@ export function EditarCilindro({
   /** Después de borrarlo: la ficha ya no existe, hay que salir de ella. */
   alBorrar(): void;
 }) {
-  const { estado, editarCilindro, borrarCilindro } = useEstado();
+  const { estado, editarCilindro, borrarCilindro, agregarPeso } = useEstado();
   const puedeBorrar = sePuedeBorrarCilindro(estado, cilindro.id);
   const gases = (estado.tiposGas ?? []).filter((g) => g.activo).map((g) => g.nombre);
 
@@ -80,6 +80,7 @@ export function EditarCilindro({
         <ElegirKilos
           etiqueta="Peso"
           pesos={pesos}
+          alAgregarPeso={agregarPeso}
           valor={kg}
           alCambiar={(nuevo) => {
             setKg(nuevo);
@@ -90,7 +91,7 @@ export function EditarCilindro({
         />
 
         <label className="block">
-          <span className="block text-sm font-medium text-tinta-2">Último gas</span>
+          <span className="block text-sm font-medium text-tinta-2">Gas</span>
           <select
             value={tipoGas}
             onChange={(e) => setTipoGas(e.target.value)}
@@ -104,7 +105,7 @@ export function EditarCilindro({
             ))}
           </select>
           <span className="mt-1 block text-sm text-tinta-2">
-            El que se propone la próxima vez que se entregue. En cada entrega se puede elegir otro.
+            Este cilindro siempre sale con este gas.
           </span>
         </label>
 

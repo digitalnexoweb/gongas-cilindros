@@ -4,13 +4,12 @@ import { vistaCilindros, type VistaCilindro } from '../../dominio/consultas';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { nombreKilos } from '../../dominio/tipos';
 import { Buscador } from '../Buscador';
-import { ChipEstado, estadoVisible, type EstadoVisible } from '../ChipEstado';
+import { ChipEstado, estadoVisible } from '../ChipEstado';
 import { Encabezado } from '../Encabezado';
 import { Importe } from '../Importe';
+import { filtrarCilindros, opcionesDeFiltro, type FiltroEstado } from './filtroCilindros';
 
-type Filtro = 'todos' | EstadoVisible | 'de_baja';
-
-const filtros: { id: Filtro; etiqueta: string }[] = [
+const filtros: { id: FiltroEstado; etiqueta: string }[] = [
   { id: 'todos', etiqueta: 'Todos' },
   { id: 'stock', etiqueta: 'En stock' },
   { id: 'en_gracia', etiqueta: 'En gracia' },
@@ -20,29 +19,23 @@ const filtros: { id: Filtro; etiqueta: string }[] = [
   { id: 'de_baja', etiqueta: 'De baja' },
 ];
 
-/** La sección 6.2: lista de todos los cilindros, con filtros y buscador por serie. */
+/** La sección 6.2: lista de todos los cilindros, con filtros por estado, gas y peso, y buscador por serie. */
 export function PantallaCilindros({ alAbrir }: { alAbrir(cilindroId: string): void }) {
   const { estado, hoy } = useEstado();
   const [busqueda, setBusqueda] = useState('');
-  const [filtro, setFiltro] = useState<Filtro>('todos');
+  const [filtro, setFiltro] = useState<FiltroEstado>('todos');
+  const [gas, setGas] = useState<string | null>(null);
+  const [kg, setKg] = useState<number | null>(null);
 
   const todas = useMemo(() => vistaCilindros(estado, hoy), [estado, hoy]);
   const enUso = useMemo(() => todas.filter((v) => v.cilindro.activo), [todas]);
 
-  const visibles = useMemo(() => {
-    const texto = busqueda.trim().toLowerCase();
+  const opciones = useMemo(() => opcionesDeFiltro(todas), [todas]);
 
-    return todas.filter((vista) => {
-      if (filtro === 'de_baja') {
-        if (vista.cilindro.activo) return false;
-      } else {
-        if (!vista.cilindro.activo) return false;
-        if (filtro !== 'todos' && estadoVisible(vista.calculo) !== filtro) return false;
-      }
-      if (texto !== '' && !vista.cilindro.serie.toLowerCase().includes(texto)) return false;
-      return true;
-    });
-  }, [todas, busqueda, filtro]);
+  const visibles = useMemo(
+    () => filtrarCilindros(todas, { estado: filtro, gas, kg, texto: busqueda }),
+    [todas, busqueda, filtro, gas, kg],
+  );
 
   return (
     <>
@@ -75,6 +68,44 @@ export function PantallaCilindros({ alAbrir }: { alAbrir(cilindroId: string): vo
             </button>
           ))}
         </div>
+
+        {/* Gas y peso: se combinan con el estado y con el buscador. */}
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="sr-only">Gas</span>
+            <select
+              value={gas ?? ''}
+              onChange={(e) => setGas(e.target.value === '' ? null : e.target.value)}
+              className={`h-11 w-full rounded-[12px] border-[1.5px] bg-white px-2 text-sm ${
+                gas === null ? 'border-linea-fuerte text-tinta-2' : 'border-tinta font-semibold text-tinta'
+              }`}
+            >
+              <option value="">Todos los gases</option>
+              {opciones.gases.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="sr-only">Peso</span>
+            <select
+              value={kg === null ? '' : String(kg)}
+              onChange={(e) => setKg(e.target.value === '' ? null : Number(e.target.value))}
+              className={`h-11 w-full rounded-[12px] border-[1.5px] bg-white px-2 text-sm ${
+                kg === null ? 'border-linea-fuerte text-tinta-2' : 'border-tinta font-semibold text-tinta'
+              }`}
+            >
+              <option value="">Todos los pesos</option>
+              {opciones.pesos.map((p) => (
+                <option key={p} value={String(p)}>
+                  {nombreKilos(p)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </Encabezado>
 
       {visibles.length === 0 ? (
@@ -104,10 +135,12 @@ function FilaCilindro({
   const { cilindro, ubicacion, calculo } = vista;
 
   const donde = ubicacion.lugar === 'cliente' ? `En ${ubicacion.cliente.nombre}` : 'En stock';
-  const detalle =
-    calculo === null
-      ? `${nombreKilos(cilindro.kg)} · ${donde}`
-      : `${nombreKilos(cilindro.kg)} · ${donde} · ${calculo.dias} días`;
+  const detalle = [
+    nombreKilos(cilindro.kg),
+    cilindro.tipoGas,
+    donde,
+    ...(calculo === null ? [] : [`${calculo.dias} días`]),
+  ].join(' · ');
 
   return (
     <button

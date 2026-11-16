@@ -91,6 +91,8 @@ type ContextoEstado = {
   editarCilindro(id: string, cambios: repositorio.CambiosCilindro): Promise<void>;
   cambiarTarifaDeKilos(kg: number, tarifa: number): Promise<number>;
   agregarKilos(kg: number, tarifa: number): Promise<void>;
+  /** Cualquier usuario: un peso nuevo, sin tarifa. Recarga y devuelve el peso como quedó. */
+  agregarPeso(kg: number): Promise<number>;
   /** Cualquier usuario activo. Recarga para que la fila muestre el aviso. */
   registrarAviso(arriendoId: string): Promise<void>;
   /** Solo el administrador. */
@@ -290,6 +292,11 @@ export function ProveedorEstado({ children }: { children: ReactNode }) {
         const cambiados = await repositorio.cambiarTarifaDeKilos(kg, tarifa);
         await recargar();
         return cambiados;
+      },
+      async agregarPeso(kg) {
+        const agregado = await repositorio.agregarPeso(kg);
+        await recargar();
+        return agregado;
       },
       async agregarKilos(kg, tarifa) {
         await repositorio.agregarKilos(kg, tarifa);

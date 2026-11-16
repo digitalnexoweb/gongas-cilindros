@@ -419,6 +419,16 @@ export async function cambiarTarifaDeKilos(kg: number, tarifa: number): Promise<
 }
 
 /** Un peso nuevo con su tarifa. Solo el administrador. */
+/**
+ * Un peso nuevo, sin tarifa: cualquier usuario lo agrega al dar de alta un
+ * cilindro. Devuelve el peso como quedó (redondeado a un decimal).
+ */
+export async function agregarPeso(kg: number): Promise<number> {
+  const { data, error } = await supabase.rpc('agregar_peso', { p_kg: kg });
+  if (error !== null) throw falla(error);
+  return Number(data);
+}
+
 export async function agregarKilos(kg: number, tarifa: number): Promise<void> {
   const { error } = await supabase.rpc('agregar_kilos', { p_kg: kg, p_tarifa: tarifa });
   if (error !== null) throw falla(error);

@@ -102,21 +102,12 @@ export function PantallaEscaneo({
   const { estado, perfil, hoy, confirmarLote, corregirKilos } = useEstado();
   const pesos = useMemo(() => pesosActivos(estado.pesos), [estado.pesos]);
 
-  // Los gases que se ofrecen al entregar, en el orden de la lista.
+  // Los gases que se ofrecen al dar de alta, en el orden de la lista. Cada
+  // cilindro tiene su gas fijo: al entregar no se elige, sale con el suyo.
   const gasesActivos = useMemo(() => {
     const lista = (estado.tiposGas ?? []).filter((g) => g.activo).map((g) => g.nombre);
     return lista.length > 0 ? lista : ['Acetileno'];
   }, [estado.tiposGas]);
-  // El gas elegido para cada serie en este lote.
-  const [gases, setGases] = useState<Record<string, string>>({});
-
-  /** El gas de una fila: el elegido, o el último con el que salió ese cilindro. */
-  function gasDe(item: ItemLote): string {
-    const elegido = gases[item.serie];
-    if (elegido !== undefined) return elegido;
-    const ultimo = gasesActivos.find((g) => g.toLowerCase() === (item.tipoGas ?? '').toLowerCase());
-    return ultimo ?? gasesActivos[0] ?? 'Acetileno';
-  }
 
   const [paso, setPaso] = useState<Paso>({ nombre: 'modo' });
   const [series, setSeries] = useState<string[]>([]);
@@ -175,7 +166,6 @@ export function PantallaEscaneo({
 
   function empezar(tipo: TipoMovimiento) {
     setSeries([]);
-    setGases({});
     setAviso(null);
     setSerieManual('');
     setErrorAlGrabar(null);
@@ -205,12 +195,8 @@ export function PantallaEscaneo({
     setErrorAlGrabar(null);
 
     try {
-      const lote = await confirmarLote(
-        tipo,
-        series,
-        clienteId,
-        tipo === 'entrega' ? items.map((i) => (i.conocido ? gasDe(i) : null)) : undefined,
-      );
+      // Sin gases: la base usa el de cada cilindro.
+      const lote = await confirmarLote(tipo, series, clienteId);
       setPaso({ nombre: 'comprobante', lote, tipo, clienteId });
     } catch (error) {
       // El lote queda en pantalla tal cual: no se pierde lo escaneado.
@@ -352,39 +338,12 @@ export function PantallaEscaneo({
           </p>
         )}
 
-        {/* Un gas para todo el lote de un toque; después se cambia el que haga falta. */}
-        {n > 1 && paso.tipo === 'entrega' && gasesActivos.length > 1 && (
-          <label className="mt-3 flex items-center gap-2 text-sm font-medium text-tinta-2">
-            <span className="shrink-0">Todos con</span>
-            <select
-              value=""
-              onChange={(e) => {
-                const gas = e.target.value;
-                if (gas === '') return;
-                setGases(Object.fromEntries(items.map((i) => [i.serie, gas])));
-              }}
-              className="h-11 min-w-0 flex-1 rounded-[15px] border-[1.5px] border-linea-fuerte bg-white px-3 text-base text-tinta"
-            >
-              <option value="">elegí un gas…</option>
-              {gasesActivos.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
         {n > 0 && (
           <ul className="mt-3 divide-y divide-linea rounded-2xl border border-linea bg-white">
             {[...items].reverse().map((item) => (
               <FilaDelLote
                 key={item.serie}
                 item={item}
-                entrega={paso.tipo === 'entrega'}
-                gas={gasDe(item)}
-                gases={gasesActivos}
-                alCambiarGas={(gas) => setGases((xs) => ({ ...xs, [item.serie]: gas }))}
                 pesos={pesos}
                 alCorregirKilos={(kg) => corregirKilos(item.serie, kg)}
                 alDarDeAlta={() => setADarDeAlta(item.serie)}
@@ -461,7 +420,6 @@ export function PantallaEscaneo({
           gases={gasesActivos}
           pesos={pesos}
           alCerrar={() => setADarDeAlta(null)}
-          alCrear={(gas) => setGases((xs) => ({ ...xs, [aDarDeAlta]: gas }))}
         />
       )}
     </div>
@@ -633,25 +591,17 @@ function tituloDeLote(lote: LoteReciente): string {
 }
 
 /**
- * Una fila del lote. El tamaño se corrige tocándolo (queda para siempre en el
- * cilindro); el gas se elige para esta entrega.
+ * Una fila del lote. El peso se corrige tocándolo (queda para siempre en el
+ * cilindro). El gas no se elige: cada cilindro tiene el suyo.
  */
 function FilaDelLote({
   item,
-  entrega,
-  gas,
-  gases,
-  alCambiarGas,
   pesos,
   alCorregirKilos,
   alDarDeAlta,
   alSacar,
 }: {
   item: ItemLote;
-  entrega: boolean;
-  gas: string;
-  gases: string[];
-  alCambiarGas(gas: string): void;
   pesos: number[];
   alCorregirKilos(kg: number): Promise<void>;
   alDarDeAlta(): void;
@@ -706,21 +656,8 @@ function FilaDelLote({
           {/* El peso: tocar otro lo corrige en el cilindro, para siempre. */}
           <ElegirKilos chico pesos={pesos} valor={item.kg} alCambiar={corregir} deshabilitado={corrigiendo} />
 
-          {entrega ? (
-            <select
-              value={gas}
-              onChange={(e) => alCambiarGas(e.target.value)}
-              aria-label={`Gas de ${item.serie}`}
-              className="h-11 min-w-0 flex-1 rounded-[12px] border-[1.5px] border-linea-fuerte bg-white px-2 text-sm font-medium text-tinta"
-            >
-              {gases.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
-            </select>
-          ) : (
-            item.tipoGas !== null && <span className="min-w-0 truncate text-sm text-tinta-2">{item.tipoGas}</span>
+          {item.tipoGas !== null && (
+            <span className="min-w-0 truncate text-sm font-medium text-tinta-2">{item.tipoGas}</span>
           )}
         </div>
       )}

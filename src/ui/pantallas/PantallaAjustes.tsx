@@ -58,7 +58,7 @@ export function PantallaAjustes({
             {puedeVerPlata && (
               <Fila
                 titulo="Tarifas"
-                detalle="El precio por mes de cada tamaño"
+                detalle="El precio por mes de cada peso"
                 alTocar={alAbrirTarifas}
               />
             )}
@@ -67,7 +67,7 @@ export function PantallaAjustes({
               detalle="El mensaje de WhatsApp y de mail que reciben los clientes"
               alTocar={alAbrirTextoAviso}
             />
-            <Fila titulo="Tipos de gas" detalle="Los que se eligen al entregar" alTocar={alAbrirTiposGas} />
+            <Fila titulo="Tipos de gas" detalle="Los que se eligen al dar de alta un cilindro" alTocar={alAbrirTiposGas} />
             <p className="px-4 py-3 text-sm text-tinta-2">
               Los clientes y los cilindros se editan desde su ficha, con el botón Editar.
             </p>

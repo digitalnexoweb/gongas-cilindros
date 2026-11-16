@@ -18,7 +18,6 @@ export function AltaCilindro({
   gases,
   pesos,
   alCerrar,
-  alCrear,
 }: {
   serie: string;
   /** Los gases que se pueden elegir, en orden. */
@@ -26,10 +25,8 @@ export function AltaCilindro({
   /** Los pesos que se pueden elegir, de menor a mayor. */
   pesos: number[];
   alCerrar(): void;
-  /** Con el gas elegido, para que la fila del lote lo muestre ya puesto. */
-  alCrear(gas: string): void;
 }) {
-  const { altaCilindro } = useEstado();
+  const { altaCilindro, agregarPeso } = useEstado();
 
   const [kg, setKg] = useState<number | null>(null);
   const [gas, setGas] = useState(gases[0] ?? 'Acetileno');
@@ -42,10 +39,7 @@ export function AltaCilindro({
     setCreando(true);
     setError(null);
     altaCilindro(serie, kg, gas)
-      .then(() => {
-        alCrear(gas);
-        alCerrar();
-      })
+      .then(alCerrar)
       .catch((falla: unknown) => {
         setError(falla instanceof Error ? falla.message : 'No se pudo dar de alta el cilindro.');
         setCreando(false);
@@ -68,10 +62,10 @@ export function AltaCilindro({
         </div>
 
         {/* Sin peso preelegido a propósito: que se mire el cilindro antes de tocar. */}
-        <ElegirKilos etiqueta="Peso" pesos={pesos} valor={kg} alCambiar={setKg} />
+        <ElegirKilos etiqueta="Peso" pesos={pesos} valor={kg} alCambiar={setKg} alAgregarPeso={agregarPeso} />
 
         <label className="block">
-          <span className="block text-sm font-medium text-tinta-2">Gas</span>
+          <span className="block text-sm font-medium text-tinta-2">Gas (siempre sale con este)</span>
           <select
             value={gas}
             onChange={(e) => setGas(e.target.value)}

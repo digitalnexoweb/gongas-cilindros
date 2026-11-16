@@ -5,7 +5,7 @@ import { Encabezado } from '../Encabezado';
 import { Campo, ErrorDeFormulario, claseBotonPrincipal } from '../Formulario';
 
 /**
- * Los gases que se pueden elegir al entregar. Solo el administrador.
+ * Los gases que se pueden elegir al dar de alta un cilindro. Solo el administrador.
  *
  * Un gas no se borra: si ya salió algún cilindro con él, el historial lo
  * nombra. Se deja de ofrecer, y se puede volver a ofrecer cuando haga falta.
@@ -30,7 +30,7 @@ export function PantallaTiposGas({ alVolver }: { alVolver(): void }) {
 
   return (
     <>
-      <Encabezado titulo="Tipos de gas" bajada="Los que se eligen al entregar" alVolver={alVolver} />
+      <Encabezado titulo="Tipos de gas" bajada="Los que se eligen al dar de alta un cilindro" alVolver={alVolver} />
 
       <div className="space-y-5 px-4 pt-4 pb-6">
         <ul className="divide-y divide-linea rounded-2xl border border-linea bg-white">
@@ -73,7 +73,7 @@ export function PantallaTiposGas({ alVolver }: { alVolver(): void }) {
             etiqueta="Agregar un gas"
             valor={nuevo}
             alCambiar={setNuevo}
-            ayuda={repetido ? 'Ese ya está en la lista.' : 'Aparece al final de la lista al entregar.'}
+            ayuda={repetido ? 'Ese ya está en la lista.' : 'Aparece al final de la lista al dar de alta un cilindro.'}
           />
           <button type="submit" disabled={!listo} className={claseBotonPrincipal}>
             {guardando ? 'Agregando…' : 'Agregar'}

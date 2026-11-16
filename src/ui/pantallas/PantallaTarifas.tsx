@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { tarifasPorKilos } from '../../datos/repositorio';
 import { formatearPesos } from '../../dominio/arriendo';
@@ -12,10 +12,26 @@ import { Reloj } from '../iconos';
  * El precio mensual de cada peso. Al cambiarlo cambian también los cilindros
  * de ese peso que tenían el precio anterior; los que tienen un precio propio,
  * puesto en su ficha, quedan como estaban.
+ *
+ * Un peso que alguien sumó al dar de alta un cilindro aparece "sin tarifa"
+ * hasta que se la pongan acá.
  */
 export function PantallaTarifas({ alVolver }: { alVolver(): void }) {
+  const { estado } = useEstado();
   const [tarifas, setTarifas] = useState<{ kg: number; tarifa: number }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Todos los pesos de la lista, tengan tarifa o no.
+  const filas = useMemo(() => {
+    if (tarifas === null) return null;
+    const kgs = new Set([
+      ...(estado.pesos ?? []).filter((p) => p.activo).map((p) => p.kg),
+      ...tarifas.map((t) => t.kg),
+    ]);
+    return [...kgs]
+      .sort((a, b) => a - b)
+      .map((kg) => ({ kg, tarifa: tarifas.find((t) => t.kg === kg)?.tarifa ?? null }));
+  }, [tarifas, estado.pesos]);
 
   const cargar = useCallback(() => {
     tarifasPorKilos()
@@ -35,16 +51,18 @@ export function PantallaTarifas({ alVolver }: { alVolver(): void }) {
         <ErrorDeFormulario mensaje={error} />
         {tarifas === null && error === null && <p className="text-sm text-tinta-2">Cargando…</p>}
 
-        {tarifas?.map(({ kg, tarifa }) => (
+        {filas?.map(({ kg, tarifa }) => (
           <TarifaDeKilos
             key={kg}
             kg={kg}
             actual={tarifa}
-            alCambiar={(nueva) => setTarifas(tarifas.map((t) => (t.kg === kg ? { kg, tarifa: nueva } : t)))}
+            alCambiar={(nueva) =>
+              setTarifas((antes) => [...(antes ?? []).filter((t) => t.kg !== kg), { kg, tarifa: nueva }])
+            }
           />
         ))}
 
-        {tarifas !== null && <AgregarPeso existentes={tarifas.map((t) => t.kg)} alAgregar={cargar} />}
+        {filas !== null && <AgregarPeso existentes={filas.map((t) => t.kg)} alAgregar={cargar} />}
 
         <p className="flex gap-2 text-sm text-tinta-2">
           <Reloj className="mt-0.5 size-4 shrink-0" />
@@ -62,12 +80,13 @@ function TarifaDeKilos({
   alCambiar,
 }: {
   kg: number;
-  actual: number;
+  /** `null`: el peso todavía no tiene tarifa. */
+  actual: number | null;
   alCambiar(nueva: number): void;
 }) {
   const { estado, cambiarTarifaDeKilos } = useEstado();
 
-  const [texto, setTexto] = useState(String(actual));
+  const [texto, setTexto] = useState(actual === null ? '' : String(actual));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hecho, setHecho] = useState<string | null>(null);
@@ -99,15 +118,26 @@ function TarifaDeKilos({
           })
           .finally(() => setGuardando(false));
       }}
-      className="space-y-3 rounded-2xl border border-linea bg-white p-4"
+      className={`space-y-3 rounded-2xl border bg-white p-4 ${actual === null ? 'border-vencer-borde' : 'border-linea'}`}
     >
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-titulo text-xl font-bold">{nombreKilos(kg)}</h2>
+        <h2 className="font-titulo text-xl font-bold">
+          {nombreKilos(kg)}
+          {actual === null && (
+            <span className="ml-2 rounded-full bg-vencer-suave px-2 py-0.5 align-middle font-sans text-xs font-semibold text-vencer">
+              Sin tarifa
+            </span>
+          )}
+        </h2>
         <span className="text-sm text-tinta-2">{cuantos === 1 ? '1 cilindro' : `${cuantos} cilindros`}</span>
       </div>
 
       <Campo
-        etiqueta={`Hoy: ${formatearPesos(actual)} por mes`}
+        etiqueta={
+          actual === null
+            ? 'Todavía no tiene tarifa: sus cilindros no generan cargo'
+            : `Hoy: ${formatearPesos(actual)} por mes`
+        }
         valor={texto}
         alCambiar={(v) => {
           setTexto(v);
@@ -126,7 +156,11 @@ function TarifaDeKilos({
       )}
 
       <button type="submit" disabled={!listo} className={claseBotonPrincipal}>
-        {guardando ? 'Guardando…' : `Cambiar tarifa de ${nombreKilos(kg)}`}
+        {guardando
+          ? 'Guardando…'
+          : actual === null
+            ? `Poner tarifa a ${nombreKilos(kg)}`
+            : `Cambiar tarifa de ${nombreKilos(kg)}`}
       </button>
     </form>
   );
