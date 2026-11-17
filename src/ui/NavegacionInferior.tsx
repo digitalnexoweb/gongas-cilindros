@@ -54,7 +54,7 @@ const items: { id: Pestana; etiqueta: string; icono: ReactNode }[] = [
   },
   {
     id: 'resumen',
-    etiqueta: 'Resumen',
+    etiqueta: 'Panel',
     icono: (
       <>
         <path d="M4 20h16" />

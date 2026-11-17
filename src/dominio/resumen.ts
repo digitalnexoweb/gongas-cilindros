@@ -68,6 +68,18 @@ export function mesSiguiente(mes: Mes): Mes {
   return numero === 12 ? `${anio + 1}-01` : `${anio}-${String(numero + 1).padStart(2, '0')}`;
 }
 
+export function mesAnterior(mes: Mes): Mes {
+  const { anio, numero } = partirMes(mes);
+  return numero === 1 ? `${anio - 1}-12` : `${anio}-${String(numero - 1).padStart(2, '0')}`;
+}
+
+/** Los `n` meses que terminan en `hasta`, del más viejo al más nuevo. */
+export function ultimosMeses(hasta: Mes, n: number): Mes[] {
+  const meses: Mes[] = [hasta];
+  while (meses.length < n) meses.unshift(mesAnterior(meses[0] ?? hasta));
+  return meses;
+}
+
 export function nombreDelMes(mes: Mes): string {
   const { anio, numero } = partirMes(mes);
   return `${NOMBRES_DE_MES[numero - 1] ?? ''} de ${anio}`;
@@ -165,6 +177,99 @@ export function resumenDelMes(
     .filter((f): f is FilaResumen => f !== undefined);
 
   return { mes, filas, total: filas.reduce((suma, f) => suma + f.total, 0) };
+}
+
+// ──────────────────────────────────────────────────────────── El panel
+
+/**
+ * Lo que va a dar el mes en curso si nadie entrega ni devuelve nada más: los
+ * arriendos abiertos siguen corriendo hasta el último día, y los que pasan el
+ * día 60 en lo que queda del mes entran solos. Es el mismo cálculo del resumen,
+ * con el "hoy" corrido a fin de mes.
+ *
+ * `null` para un mes que no es el actual, o si falta alguna tarifa.
+ */
+export function proyeccionDelMes(estado: EstadoApp, mes: Mes, hoy: FechaISO): number | null {
+  if (mes !== mesDe(hoy)) return null;
+  return resumenDelMes(estado, mes, ultimoDiaDelMes(mes))?.total ?? null;
+}
+
+/** El total devengado de cada mes, en el orden dado. `null` si falta alguna tarifa. */
+export function devengadoPorMes(
+  estado: EstadoApp,
+  meses: Mes[],
+  hoy: FechaISO,
+): { mes: Mes; total: number }[] | null {
+  const totales: { mes: Mes; total: number }[] = [];
+  for (const mes of meses) {
+    // Un mes que todavía no empezó no tiene nada devengado.
+    const resumen = mes > mesDe(hoy) ? { total: 0 } : resumenDelMes(estado, mes, hoy);
+    if (resumen === null) return null;
+    totales.push({ mes, total: resumen.total });
+  }
+  return totales;
+}
+
+/**
+ * Cuánto cambió un importe contra otro, en por ciento entero: +12, −5.
+ * `null` si el anterior fue cero, porque cualquier porcentaje sería mentira.
+ */
+export function variacion(actual: number, anterior: number): number | null {
+  if (anterior === 0) return null;
+  return Math.round(((actual - anterior) / anterior) * 100);
+}
+
+/** Los arriendos abiertos, con su tarifa por día y en qué fecha empiezan a cobrar. */
+function abiertosConTarifa(
+  estado: EstadoApp,
+): { arriendo: Arriendo; porDia: number | null; inicioDelCargo: FechaISO }[] {
+  return estado.arriendos
+    .filter((a) => a.fechaDevolucion === null)
+    .flatMap((arriendo) => {
+      const cilindro = estado.cilindros.find((c) => c.id === arriendo.cilindroId);
+      if (cilindro === undefined) return [];
+      return [
+        {
+          arriendo,
+          porDia: cilindro.tarifaMensual === null ? null : tarifaDiaria(cilindro.tarifaMensual),
+          inicioDelCargo: sumarDias(arriendo.fechaEntrega, DIAS_GRACIA + 1),
+        },
+      ];
+    });
+}
+
+/** Suma tarifas por día y redondea una sola vez. `null` si a alguna no se la puede ver. */
+function sumarPorDia(porDia: (number | null)[]): number | null {
+  if (porDia.some((p) => p === null)) return null;
+  return Math.round(porDia.reduce<number>((suma, p) => suma + (p ?? 0), 0));
+}
+
+/**
+ * Lo que suman por día los cilindros que hoy ya generan cargo: cuánto crece lo
+ * devengado cada día que pasa sin que vuelvan.
+ */
+export function cargoPorDia(estado: EstadoApp, hoy: FechaISO): number | null {
+  return sumarPorDia(
+    abiertosConTarifa(estado)
+      .filter((a) => a.inicioDelCargo <= hoy)
+      .map((a) => a.porDia),
+  );
+}
+
+/**
+ * Los arriendos que empiezan a generar cargo en los próximos `dias` días,
+ * sin contar hoy: cuántos son y cuánto van a sumar por día.
+ */
+export function empiezanACobrar(
+  estado: EstadoApp,
+  hoy: FechaISO,
+  dias = 7,
+): { cantidad: number; porDia: number | null } {
+  const limite = sumarDias(hoy, dias);
+  const proximos = abiertosConTarifa(estado).filter(
+    (a) => a.inicioDelCargo > hoy && a.inicioDelCargo <= limite,
+  );
+  return { cantidad: proximos.length, porDia: sumarPorDia(proximos.map((a) => a.porDia)) };
 }
 
 /** Los meses del selector: desde el movimiento más viejo hasta hoy, el actual primero. */

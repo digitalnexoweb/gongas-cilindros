@@ -1,86 +1,146 @@
 import { useMemo, useState } from 'react';
 
-import { formatearPesos } from '../../dominio/arriendo';
+import { formatearFecha, formatearPesos } from '../../dominio/arriendo';
+import { vistaCilindros } from '../../dominio/consultas';
 import {
+  cargoPorDia,
   csvDelResumen,
+  devengadoPorMes,
+  empiezanACobrar,
+  mesAnterior,
   mesDe,
   mesesConMovimiento,
   nombreArchivoCSV,
   nombreDelMes,
+  proyeccionDelMes,
   resumenDelMes,
+  ultimosMeses,
+  variacion,
   type Mes,
+  type ResumenMensual,
 } from '../../dominio/resumen';
 import { useEstado } from '../../estado/ProveedorEstado';
 import { descargarTexto } from '../descargar';
 import { Encabezado } from '../Encabezado';
+import { GraficoMeses } from '../panel/GraficoMeses';
+import { MovimientoDelMes } from '../panel/MovimientoDelMes';
+import { conteoDeHoy, movimientoDelMes, stockPorGasYPeso } from '../panel/panel';
+import { SelectorMes } from '../panel/SelectorMes';
+import { StockPorGas } from '../panel/StockPorGas';
+import { TarjetaPlata } from '../panel/TarjetaPlata';
+import { LoQueViene, TarjetasHoy } from '../panel/TarjetasHoy';
+import type { FiltroInicial } from './filtroCilindros';
 
 /**
- * La sección 6.5. El mes muestra lo **devengado en ese mes**, no el acumulado:
- * así los meses se suman sin pisarse y el CSV sirve para cobrar.
+ * El panel: cómo está el negocio de un vistazo. Lo abren todos; la plata la ve
+ * solo el administrador.
+ *
+ * La plata del mes muestra lo **devengado en ese mes**, no el acumulado: así los
+ * meses se suman sin pisarse y el CSV sirve para cobrar (sección 6.5).
  */
-export function PantallaResumen() {
+export function PantallaResumen({ alVerCilindros }: { alVerCilindros(filtro: FiltroInicial): void }) {
   const { estado, hoy, puedeVerPlata } = useEstado();
 
+  const mesActual = mesDe(hoy);
   const meses = useMemo(() => mesesConMovimiento(estado, hoy), [estado, hoy]);
-  const [mes, setMes] = useState<Mes>(() => mesDe(hoy));
-  const resumen = useMemo(() => resumenDelMes(estado, mes, hoy), [estado, mes, hoy]);
+  const [mes, setMes] = useState<Mes>(mesActual);
 
-  if (!puedeVerPlata) {
-    return (
-      <>
-        <Encabezado titulo="Resumen del mes" />
-        <p className="px-8 pt-16 text-center text-sm text-slate-500">
-          El resumen del mes muestra importes, así que lo ve solo el administrador.
-        </p>
-      </>
-    );
-  }
+  const vistas = useMemo(() => vistaCilindros(estado, hoy), [estado, hoy]);
+  const conteo = useMemo(() => conteoDeHoy(vistas), [vistas]);
+  const stock = useMemo(() => stockPorGasYPeso(vistas), [vistas]);
+  const viene = useMemo(() => empiezanACobrar(estado, hoy), [estado, hoy]);
+  const movimiento = useMemo(() => movimientoDelMes(estado, mes), [estado, mes]);
+
+  // La plata: todo `null` si quien mira no puede ver tarifas.
+  const plata = useMemo(() => {
+    if (!puedeVerPlata) return null;
+    const resumen = resumenDelMes(estado, mes, hoy);
+    const proyeccion = proyeccionDelMes(estado, mes, hoy);
+    const anteriorMes = mesAnterior(mes);
+    const anteriorTotal = resumenDelMes(estado, anteriorMes, hoy)?.total ?? null;
+    // Se compara lo que daría el mes entero, no lo que va: si no, todo mes en
+    // curso parecería peor que el anterior.
+    const base = proyeccion ?? resumen?.total ?? null;
+    return {
+      resumen,
+      proyeccion,
+      anterior: anteriorTotal === null ? null : { mes: anteriorMes, total: anteriorTotal },
+      variacion: base === null || anteriorTotal === null ? null : variacion(base, anteriorTotal),
+      porDia: cargoPorDia(estado, hoy),
+      seisMeses: devengadoPorMes(estado, ultimosMeses(mesActual, 6), hoy),
+      proyeccionActual: proyeccionDelMes(estado, mesActual, hoy),
+    };
+  }, [puedeVerPlata, estado, mes, hoy, mesActual]);
+
+  // El gráfico también elige mes, y puede elegir uno anterior al primer movimiento.
+  const elegirMes = (m: Mes) => setMes(m);
+  const opcionesDeMes = meses.includes(mes) ? meses : [...meses, mes].sort().reverse();
 
   return (
     <>
-      <Encabezado titulo="Resumen del mes" bajada="Lo devengado en el mes elegido">
-        <select
-          value={mes}
-          onChange={(e) => setMes(e.target.value)}
-          aria-label="Mes del resumen"
-          className="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-base focus:border-slate-900 focus:outline-none"
-        >
-          {meses.map((m) => (
-            <option key={m} value={m}>
-              {nombreDelMes(m)}
-            </option>
-          ))}
-        </select>
-      </Encabezado>
+      <Encabezado titulo="Panel" bajada={`Hoy, ${formatearFecha(hoy)}`} />
 
-      {/* DISENO.md: "la plata va arriba". El total abre la pantalla, aunque sea $ 0. */}
-      {resumen !== null && (
-        <section className="mx-4 mt-4 rounded-2xl bg-marca px-5 py-5 text-white">
-          <p className="text-xs font-semibold tracking-wider text-marca-clara uppercase">
-            Total de {nombreDelMes(mes)}
-          </p>
-          <p className="mt-1 font-titulo text-[42px] leading-none font-bold tabular-nums">
-            {formatearPesos(resumen.total)}
-          </p>
-          <p className="mt-3 text-sm text-marca-clara">
-            {resumen.filas.length === 1 ? '1 cliente' : `${resumen.filas.length} clientes`} ·{' '}
-            {resumen.filas.reduce((s, f) => s + f.diasFacturables, 0)} días facturables
-          </p>
-        </section>
+      {plata !== null && (
+        <TarjetaPlata
+          mes={mes}
+          meses={opcionesDeMes}
+          alElegirMes={elegirMes}
+          esMesActual={mes === mesActual}
+          total={plata.resumen?.total ?? null}
+          proyeccion={plata.proyeccion}
+          anterior={plata.anterior}
+          variacion={plata.variacion}
+          porDia={plata.porDia}
+        />
       )}
 
+      <TarjetasHoy conteo={conteo} alVer={alVerCilindros} />
+      <LoQueViene cantidad={viene.cantidad} porDia={puedeVerPlata ? viene.porDia : null} alVer={alVerCilindros} />
+      <StockPorGas filas={stock} alVer={alVerCilindros} />
+
+      {plata?.seisMeses != null && (
+        <GraficoMeses
+          totales={plata.seisMeses}
+          mesActual={mesActual}
+          proyeccion={plata.proyeccionActual}
+          elegido={mes}
+          alElegir={elegirMes}
+        />
+      )}
+
+      <MovimientoDelMes
+        mes={mes}
+        movimiento={movimiento}
+        selector={
+          plata === null ? <SelectorMes mes={mes} meses={opcionesDeMes} alElegir={elegirMes} /> : undefined
+        }
+      />
+
+      {plata !== null && <DetalleDelMes mes={mes} resumen={plata.resumen} />}
+
+      <div className="h-6" />
+    </>
+  );
+}
+
+/** La planilla de cobro del mes, por cliente, con el CSV. Es la de siempre. */
+function DetalleDelMes({ mes, resumen }: { mes: Mes; resumen: ResumenMensual | null }) {
+  return (
+    <section className="mt-6">
+      <h2 className="mx-4 mb-2 text-xs font-bold tracking-wider text-tinta-2 uppercase">
+        Por cliente, {nombreDelMes(mes)}
+      </h2>
+
       {resumen === null ? (
-        <p className="px-8 pt-16 text-center text-sm text-slate-500">
-          A algún cilindro con cargo en {nombreDelMes(mes)} le falta la tarifa, así que el total
-          no se puede calcular.
+        <p className="mx-4 text-sm text-tinta-2">
+          A algún cilindro con cargo en {nombreDelMes(mes)} le falta la tarifa, así que el detalle no se puede
+          calcular.
         </p>
       ) : resumen.filas.length === 0 ? (
-        <p className="px-8 pt-16 text-center text-sm text-slate-500">
-          En {nombreDelMes(mes)} ningún cilindro generó cargo.
-        </p>
+        <p className="mx-4 text-sm text-tinta-2">En {nombreDelMes(mes)} ningún cilindro generó cargo.</p>
       ) : (
         <>
-          <ul className="mt-4 divide-y divide-slate-200 border-y border-slate-200 bg-white">
+          <ul className="divide-y divide-linea border-y border-linea bg-white">
             {resumen.filas.map((fila) => (
               <li key={fila.cliente.id} className="px-4 py-3.5">
                 <div className="flex items-baseline justify-between gap-3">
@@ -89,36 +149,33 @@ export function PantallaResumen() {
                     {formatearPesos(fila.total)}
                   </span>
                 </div>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  {fila.cilindros === 1 ? '1 cilindro' : `${fila.cilindros} cilindros`} ·{' '}
-                  {fila.diasFacturables} días facturables
+                <p className="mt-1 text-sm text-tinta-2">
+                  {fila.cilindros === 1 ? '1 cilindro' : `${fila.cilindros} cilindros`} · {fila.diasFacturables} días
+                  facturables
                 </p>
               </li>
             ))}
           </ul>
 
-          <div className="flex items-baseline justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4">
+          <div className="flex items-baseline justify-between gap-4 border-b border-linea bg-white px-4 py-4">
             <span className="text-base font-semibold">Total del mes</span>
-            <span className="text-xl font-bold tabular-nums text-cargo">
-              {formatearPesos(resumen.total)}
-            </span>
+            <span className="text-xl font-bold tabular-nums text-cargo">{formatearPesos(resumen.total)}</span>
           </div>
         </>
       )}
 
-      <div className="px-4 py-5">
+      <div className="px-4 pt-4">
         <button
           type="button"
           disabled={resumen === null}
           onClick={() => {
             if (resumen !== null) descargarTexto(nombreArchivoCSV(mes), csvDelResumen(resumen));
           }}
-          className="h-13 w-full rounded-xl border border-slate-900 py-3.5 text-base font-semibold active:bg-slate-100"
+          className="h-13 w-full rounded-[15px] border-2 border-tinta py-3 text-base font-semibold active:bg-fondo disabled:opacity-40"
         >
           Exportar a CSV
         </button>
       </div>
-    </>
+    </section>
   );
 }

@@ -11,6 +11,7 @@ import {
   estadoArriendo,
   formatearFecha,
   formatearPesos,
+  formatearPesosCorto,
   hoyISO,
   importeArriendo,
   parseFechaISO,
@@ -347,5 +348,23 @@ describe('criterios de aceptacion del SPEC', () => {
     expect(devueltoHoy.importe).toBe(enElCliente.importe);
     expect(unMesDespues.dias).toBe(92);
     expect(unMesDespues.importe).toBe(469);
+  });
+});
+
+describe('formatearPesosCorto', () => {
+  it('menos de mil, entero', () => {
+    expect(formatearPesosCorto(0)).toBe('$ 0');
+    expect(formatearPesosCorto(950)).toBe('$ 950');
+  });
+
+  it('miles, con un decimal hasta diez mil', () => {
+    expect(formatearPesosCorto(4500)).toBe('$ 4,5 mil');
+    expect(formatearPesosCorto(4000)).toBe('$ 4 mil');
+    expect(formatearPesosCorto(12_345)).toBe('$ 12 mil');
+  });
+
+  it('millones', () => {
+    expect(formatearPesosCorto(1_234_567)).toBe('$ 1,2 M');
+    expect(formatearPesosCorto(25_000_000)).toBe('$ 25 M');
   });
 });

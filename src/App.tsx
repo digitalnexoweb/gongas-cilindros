@@ -17,6 +17,7 @@ import { PantallaResumen } from './ui/pantallas/PantallaResumen';
 import { PantallaTarifas } from './ui/pantallas/PantallaTarifas';
 import { PantallaTextoAviso } from './ui/pantallas/PantallaTextoAviso';
 import { PantallaTiposGas } from './ui/pantallas/PantallaTiposGas';
+import type { FiltroInicial } from './ui/pantallas/filtroCilindros';
 import { PantallaCambiarClave } from './ui/pantallas/PantallaCambiarClave';
 import { PantallaNuevaClave } from './ui/pantallas/PantallaNuevaClave';
 import { PantallaUsuarios } from './ui/pantallas/PantallaUsuarios';
@@ -104,6 +105,8 @@ function Armazon() {
   // Escanear es la pantalla de inicio, como dice la sección 6.1.
   const [pestana, setPestana] = useState<Pestana>('escanear');
   const [capas, setCapas] = useState<Capa[]>([]);
+  // Con qué filtro se abre Cilindros: vacío, salvo cuando se llega desde el panel.
+  const [filtroCilindros, setFiltroCilindros] = useState<FiltroInicial>({});
   // Mientras se escanea un lote, y en su comprobante, no hay barra de navegación.
   const [enFlujo, setEnFlujo] = useState(false);
 
@@ -137,7 +140,15 @@ function Armazon() {
   // Cambiar de pestaña cierra las capas y no apila historia.
   const irA = useCallback((siguiente: Pestana) => {
     setCapas([]);
+    setFiltroCilindros({});
     setPestana(siguiente);
+  }, []);
+
+  // Tocar una tarjeta del panel abre Cilindros con ese filtro ya puesto.
+  const verCilindros = useCallback((filtro: FiltroInicial) => {
+    setCapas([]);
+    setFiltroCilindros(filtro);
+    setPestana('cilindros');
   }, []);
 
   const capa = capas.at(-1) ?? null;
@@ -155,13 +166,18 @@ function Armazon() {
             />
           )}
           {pestana === 'cilindros' && (
-            <PantallaCilindros alAbrir={(id) => abrir({ tipo: 'cilindro', id })} />
+            <PantallaCilindros
+              // Otra key con otro filtro: la lista arranca de nuevo con el que viene.
+              key={JSON.stringify(filtroCilindros)}
+              filtroInicial={filtroCilindros}
+              alAbrir={(id) => abrir({ tipo: 'cilindro', id })}
+            />
           )}
           {pestana === 'clientes' && (
             <PantallaClientes alAbrir={(id) => abrir({ tipo: 'cliente', id })} />
           )}
           {pestana === 'avisos' && <PantallaAvisos />}
-          {pestana === 'resumen' && <PantallaResumen />}
+          {pestana === 'resumen' && <PantallaResumen alVerCilindros={verCilindros} />}
         </>
       )}
 

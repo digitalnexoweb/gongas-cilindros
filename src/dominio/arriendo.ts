@@ -191,6 +191,25 @@ export function formatearPesos(monto: number): string {
 }
 
 /**
+ * Pesos en poco lugar, para las barras del panel: `$ 950`, `$ 4,5 mil`,
+ * `$ 12 mil`, `$ 1,2 M`. Para leer de un vistazo; el importe exacto va aparte.
+ */
+export function formatearPesosCorto(monto: number): string {
+  const entero = Math.round(monto);
+  const signo = entero < 0 ? '-' : '';
+  const absoluto = Math.abs(entero);
+  const conComa = (n: number, decimales: number) => n.toFixed(decimales).replace('.', ',').replace(/,0$/, '');
+
+  if (absoluto < 1000) return `${signo}$ ${absoluto}`;
+  if (absoluto < 1_000_000) {
+    const miles = absoluto / 1000;
+    return `${signo}$ ${conComa(miles, miles < 10 ? 1 : 0)} mil`;
+  }
+  const millones = absoluto / 1_000_000;
+  return `${signo}$ ${conComa(millones, millones < 10 ? 1 : 0)} M`;
+}
+
+/**
  * Una fecha para mostrar en pantalla: `05/08/2026`.
  * Es el mismo formato que usa el texto de WhatsApp de la sección 6.4.
  */

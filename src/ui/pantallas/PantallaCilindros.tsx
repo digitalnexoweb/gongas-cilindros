@@ -7,7 +7,7 @@ import { Buscador } from '../Buscador';
 import { ChipEstado, estadoVisible } from '../ChipEstado';
 import { Encabezado } from '../Encabezado';
 import { Importe } from '../Importe';
-import { filtrarCilindros, opcionesDeFiltro, type FiltroEstado } from './filtroCilindros';
+import { filtrarCilindros, opcionesDeFiltro, type FiltroEstado, type FiltroInicial } from './filtroCilindros';
 
 const filtros: { id: FiltroEstado; etiqueta: string }[] = [
   { id: 'todos', etiqueta: 'Todos' },
@@ -20,12 +20,19 @@ const filtros: { id: FiltroEstado; etiqueta: string }[] = [
 ];
 
 /** La sección 6.2: lista de todos los cilindros, con filtros por estado, gas y peso, y buscador por serie. */
-export function PantallaCilindros({ alAbrir }: { alAbrir(cilindroId: string): void }) {
+export function PantallaCilindros({
+  alAbrir,
+  filtroInicial = {},
+}: {
+  alAbrir(cilindroId: string): void;
+  /** Desde el panel se llega con un filtro ya puesto; después se cambia como siempre. */
+  filtroInicial?: FiltroInicial;
+}) {
   const { estado, hoy } = useEstado();
   const [busqueda, setBusqueda] = useState('');
-  const [filtro, setFiltro] = useState<FiltroEstado>('todos');
-  const [gas, setGas] = useState<string | null>(null);
-  const [kg, setKg] = useState<number | null>(null);
+  const [filtro, setFiltro] = useState<FiltroEstado>(filtroInicial.estado ?? 'todos');
+  const [gas, setGas] = useState<string | null>(filtroInicial.gas ?? null);
+  const [kg, setKg] = useState<number | null>(filtroInicial.kg ?? null);
 
   const todas = useMemo(() => vistaCilindros(estado, hoy), [estado, hoy]);
   const enUso = useMemo(() => todas.filter((v) => v.cilindro.activo), [todas]);

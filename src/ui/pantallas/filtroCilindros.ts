@@ -18,6 +18,9 @@ export type FiltroCilindros = {
   texto: string;
 };
 
+/** Con lo que se abre la lista cuando se llega desde el panel. */
+export type FiltroInicial = Partial<Pick<FiltroCilindros, 'estado' | 'gas' | 'kg'>>;
+
 export function filtrarCilindros(vistas: VistaCilindro[], filtro: FiltroCilindros): VistaCilindro[] {
   const texto = filtro.texto.trim().toLowerCase();
 

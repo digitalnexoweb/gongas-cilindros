@@ -10,7 +10,7 @@ export function estadoVisible(calculo: { estado: EstadoArriendo } | null): Estad
   return calculo?.estado ?? 'stock';
 }
 
-const etiquetas: Record<EstadoVisible, string> = {
+export const etiquetas: Record<EstadoVisible, string> = {
   en_gracia: 'En gracia',
   por_vencer: 'Por vencer',
   generando_cargo: 'Generando cargo',
@@ -53,6 +53,27 @@ const iconos: Record<EstadoVisible, ReactNode> = {
     </>
   ),
 };
+
+/** El icono de un estado solo, para tarjetas más grandes que el chip. */
+export function IconoEstado({ estado, className = 'size-5' }: { estado: EstadoVisible; className?: string }) {
+  return (
+    <svg
+      className={`shrink-0 ${className}`}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {iconos[estado]}
+    </svg>
+  );
+}
+
+/** Los colores de cada estado, para que una tarjeta se vea igual que su chip. */
+export const coloresEstado = clases;
 
 /** Medidas de DISENO.md, sección 4: 25 px de alto, 12 px bold, icono de 12 px. */
 export function ChipEstado({ estado }: { estado: EstadoVisible }) {
